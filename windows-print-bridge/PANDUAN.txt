@@ -1,0 +1,29 @@
+================================================================
+PANDUAN PENGGUNAAN PRINT BRIDGE ANTREAN RS (WINDOWS)
+================================================================
+
+Folder ini berisi tool Print Bridge agar printer thermal USB di komputer
+Windows dapat mencetak tiket antrean secara OTOMATIS & LANGSUNG
+tanpa memunculkan dialog/preview cetak Chrome sama sekali.
+
+CARA PENGGUNAAN:
+
+1. AGAR OTOMATIS JALAN DI BACKGROUND (DIREKOMENDASIKAN):
+   - Klik kanan 'pasang-autostart-background.bat', pilih Run as Administrator / Buka.
+   - Script akan otomatis mendaftarkan Print Bridge ke Windows Startup.
+   - Setiap kali komputer Windows dinyalakan atau restart, Print Bridge
+     akan langsung AKTIF di latar belakang (background) tanpa jendela hitam!
+
+2. JIKA HANYA INGIN MENJALANKAN MANUAL DENGAN JENDELA TERLIHAT:
+   - Klik 2x 'jalankan-printer-bridge.bat'.
+   - Jendela hitam akan menampilkan log tiket yang dicetak.
+
+3. UNTUK MENGECEK STATUS APAKAH SEDANG BERJALAN:
+   - Klik 2x 'cek-status.bat'.
+
+4. UNTUK MENGHENTIKAN PROSES BACKGROUND:
+   - Klik 2x 'hentikan-printer-bridge.bat'.
+
+5. UNTUK MENCABUT DARI STARTUP WINDOWS:
+   - Klik 2x 'hapus-autostart.bat'.
+================================================================

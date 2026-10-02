@@ -1,0 +1,12 @@
+{
+  "watch": ["server.js", "db.js"],
+  "ext": "js,mjs,json",
+  "ignore": [
+    "src/*",
+    "dist/*",
+    "node_modules/*",
+    "*.json",
+    ".git/*"
+  ],
+  "delay": "1000"
+}

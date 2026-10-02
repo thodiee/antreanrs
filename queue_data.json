@@ -1,0 +1,104 @@
+{
+  "hospital": {
+    "name": "RSUD Harapan Sehat",
+    "tagline": "Layanan Kesehatan Cerdas, Cepat, dan Empati",
+    "runningText": "Selamat datang di RSUD Harapan Sehat. Mohon siapkan kartu identitas / BPJS Anda. Jaga ketertiban dan prokes di ruang tunggu. Informasi pendaftaran hotline: (021) 555-0199.",
+    "videoList": [
+      {
+        "id": "v1",
+        "title": "Profil RSUD Harapan Sehat",
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+      },
+      {
+        "id": "v2",
+        "title": "Edukasi Kesehatan Pasien",
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+      }
+    ]
+  },
+  "clinics": [
+    {
+      "id": "c1",
+      "name": "Poliklinik Umum",
+      "prefix": "A",
+      "quota": 50,
+      "active": true,
+      "description": "Pemeriksaan kesehatan umum & rujukan"
+    },
+    {
+      "id": "c2",
+      "name": "Poliklinik Gigi & Mulut",
+      "prefix": "B",
+      "quota": 30,
+      "active": true,
+      "description": "Perawatan & konsultasi kesehatan gigi"
+    },
+    {
+      "id": "c3",
+      "name": "Poliklinik KIA / Kebidanan",
+      "prefix": "C",
+      "quota": 40,
+      "active": true,
+      "description": "Kesehatan ibu, anak, dan imunisasi"
+    },
+    {
+      "id": "c4",
+      "name": "Poliklinik Spesialis Anak",
+      "prefix": "D",
+      "quota": 25,
+      "active": true,
+      "description": "Dokter spesialis kesehatan anak"
+    },
+    {
+      "id": "c5",
+      "name": "Poliklinik Penyakit Dalam",
+      "prefix": "E",
+      "quota": 35,
+      "active": true,
+      "description": "Konsultasi organ dalam & spesialis"
+    },
+    {
+      "id": "c6",
+      "name": "Apotek & Depo Farmasi",
+      "prefix": "F",
+      "quota": 100,
+      "active": true,
+      "description": "Pengambilan resep obat & konsultasi obat"
+    }
+  ],
+  "counters": [
+    {
+      "id": "l1",
+      "name": "Loket 1",
+      "clinicId": "c1"
+    },
+    {
+      "id": "l2",
+      "name": "Loket 2",
+      "clinicId": "c2"
+    },
+    {
+      "id": "l3",
+      "name": "Loket 3",
+      "clinicId": "c3"
+    },
+    {
+      "id": "l4",
+      "name": "Loket 4",
+      "clinicId": "c4"
+    },
+    {
+      "id": "l5",
+      "name": "Loket 5",
+      "clinicId": "c5"
+    },
+    {
+      "id": "l6",
+      "name": "Loket Farmasi 1",
+      "clinicId": "c6"
+    }
+  ],
+  "tickets": [],
+  "history": [],
+  "lastResetDate": "2026-10-01"
+}
