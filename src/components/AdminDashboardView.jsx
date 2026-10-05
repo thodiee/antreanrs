@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Maximize2, MoveHorizontal, X, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Maximize2, MoveHorizontal, X, ExternalLink, Volume2 } from 'lucide-react';
 import ThermalTicketModal from './ThermalTicketModal';
 import { parseVideoUrl } from '../utils/videoHelper';
 
@@ -17,8 +17,8 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   });
   const [addVideoModalOpen, setAddVideoModalOpen] = useState(false);
   const [videoModalUrl, setVideoModalUrl] = useState('');
-  const [videoModalTitle, setVideoModalTitle] = useState('');
-  const [videoModalDuration, setVideoModalDuration] = useState(30);
+  const [videoModalDuration, setVideoModalDuration] = useState(0);
+  const [customModalDuration, setCustomModalDuration] = useState('');
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
   const [isResettingShift, setIsResettingShift] = useState(false);
   const [clinicList, setClinicList] = useState(clinics || []);
@@ -365,7 +365,8 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         const newVid = {
           id: `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
           title: file.name.replace(/\.[^/.]+$/, ''),
-          url: reader.result
+          url: reader.result,
+          duration: 0 // Otomatis putar penuh sampai selesai
         };
         setVideoList(prev => [...prev, newVid]);
         showToast(`Video "${file.name}" berhasil ditambahkan ke playlist!`);
@@ -377,7 +378,8 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   const handleOpenAddVideoModal = () => {
     setVideoModalUrl('');
     setVideoModalTitle('');
-    setVideoModalDuration(30);
+    setVideoModalDuration(0); // 0 = Putar sampai selesai (Otomatis)
+    setCustomModalDuration('');
     setAddVideoModalOpen(true);
   };
 
@@ -418,16 +420,27 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     else if (parsed.type === 'instagram') defaultTitle = 'Video Instagram Reels';
     else if (parsed.type === 'gdrive') defaultTitle = 'Video Google Drive';
 
+    const resolvedDuration = videoModalDuration === 'custom'
+      ? (parseInt(customModalDuration) || 0)
+      : (parseInt(videoModalDuration) || 0);
+
     const newVid = {
       id: `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       title: finalTitle || defaultTitle,
       url: finalUrl,
-      duration: videoModalDuration || (parsed.type === 'youtube' ? 60 : 30),
+      duration: resolvedDuration,
       thumbnailUrl: finalThumbnail
     };
     setVideoList(prev => [...prev, newVid]);
     setAddVideoModalOpen(false);
     showToast(`Video "${newVid.title}" berhasil ditambahkan ke playlist!`);
+  };
+
+  const handleSetAllVideosDuration = (d) => {
+    if (videoList.length === 0) return;
+    setVideoList(videoList.map(v => ({ ...v, duration: d })));
+    const label = d === 0 ? 'Putar Sampai Selesai (Otomatis)' : `${d} detik`;
+    showToast(`Semua video diatur ke: ${label}`);
   };
 
   const handleDeleteVideo = (id) => {
@@ -532,7 +545,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
           {currentUser && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>
-              <ShieldCheck size={16} color="#0284c7" />
+              <ShieldCheck size={16} color="#15803d" />
               <span>Login: <strong>{currentUser.name}</strong> ({currentUser.role})</span>
             </div>
           )}
@@ -574,9 +587,9 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
             style={{
               fontWeight: '800',
               borderRadius: '8px',
-              background: activeTab === 'users' ? 'white' : '#e0f2fe',
-              color: activeTab === 'users' ? '#0369a1' : '#0284c7',
-              border: '1px solid #bae6fd'
+              background: activeTab === 'users' ? 'white' : '#ecfdf5',
+              color: activeTab === 'users' ? '#166534' : '#15803d',
+              border: '1px solid #a7f3d0'
             }}
           >
             <Users size={16} /> 5. Manajemen Pengguna
@@ -594,48 +607,9 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
       {/* TAB 1: OVERVIEW & REPORTS */}
       {activeTab === 'overview' && (
         <>
-          {/* Quick Access to User Management Banner */}
-          <div style={{
-            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-            color: 'white',
-            padding: '1.15rem 1.5rem',
-            borderRadius: '16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '12px',
-            boxShadow: '0 4px 15px rgba(2, 132, 199, 0.25)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.2)', width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Users size={22} color="white" />
-              </div>
-              <div>
-                <div style={{ fontWeight: '800', fontSize: '1.05rem' }}>Manajemen Pengguna & Otoritas Petugas</div>
-                <div style={{ fontSize: '0.82rem', opacity: 0.9 }}>Atur hak akses login untuk Petugas Pendaftaran (Kiosk), Poliklinik, Farmasi, dan Admin</div>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('users')}
-              style={{
-                background: 'white',
-                color: '#0369a1',
-                border: 'none',
-                padding: '9px 18px',
-                borderRadius: '10px',
-                fontWeight: '800',
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-              }}
-            >
-              Kelola Pengguna Sekarang ➔
-            </button>
-          </div>
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-icon" style={{ background: '#0284c7' }}>
+              <div className="stat-icon" style={{ background: '#15803d' }}>
                 <Users size={26} />
               </div>
               <div>
@@ -701,7 +675,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                   return (
                     <tr key={c.id}>
                       <td style={{ fontWeight: '700' }}>{c.name}</td>
-                      <td><span style={{ fontWeight: '800', color: '#0284c7' }}>[{c.prefix}]</span></td>
+                      <td><span style={{ fontWeight: '800', color: '#15803d' }}>[{c.prefix}]</span></td>
                       <td>{list.length} Pasien</td>
                       <td><span style={{ color: '#047857', fontWeight: '700' }}>{list.filter(t => t.status === 'COMPLETED').length}</span></td>
                       <td><span style={{ color: '#b91c1c', fontWeight: '700' }}>{list.filter(t => t.status === 'SKIPPED').length}</span></td>
@@ -743,12 +717,12 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                 ) : (
                   todayTickets.map((t) => (
                     <tr key={t.id}>
-                      <td style={{ fontWeight: '800', color: '#0284c7' }}>{t.ticketNumber}</td>
+                      <td style={{ fontWeight: '800', color: '#15803d' }}>{t.ticketNumber}</td>
                       <td style={{ fontWeight: '700', color: '#0f172a' }}>{t.patientName || 'Pasien Umum'}</td>
                       <td>{t.nik !== '-' ? t.nik : (t.norm !== '-' ? t.norm : '-')}</td>
                       <td>{t.phone || '-'}</td>
                       <td>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '800', background: t.patientType === 'BPJS' ? '#e0f2fe' : '#ccfbf1', color: t.patientType === 'BPJS' ? '#0369a1' : '#0d9488', padding: '2px 8px', borderRadius: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', background: t.patientType === 'BPJS' ? '#ecfdf5' : '#fef3c7', color: t.patientType === 'BPJS' ? '#166534' : '#b45309', padding: '2px 8px', borderRadius: '8px' }}>
                           {t.patientType || 'BPJS'}
                         </span>
                       </td>
@@ -757,8 +731,8 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                       <td>
                         <span style={{
                           padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '700',
-                          background: t.status === 'WAITING' ? '#fef3c7' : t.status === 'CALLED' ? '#e0f2fe' : t.status === 'COMPLETED' ? '#d1fae5' : '#fee2e2',
-                          color: t.status === 'WAITING' ? '#d97706' : t.status === 'CALLED' ? '#0369a1' : t.status === 'COMPLETED' ? '#047857' : '#b91c1c'
+                          background: t.status === 'WAITING' ? '#fef3c7' : t.status === 'CALLED' ? '#ecfdf5' : t.status === 'COMPLETED' ? '#d1fae5' : '#fee2e2',
+                          color: t.status === 'WAITING' ? '#d97706' : t.status === 'CALLED' ? '#15803d' : t.status === 'COMPLETED' ? '#047857' : '#b91c1c'
                         }}>
                           {t.status}
                         </span>
@@ -812,7 +786,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         <button
                           onClick={() => handleMoveClinic(idx, -1)}
                           disabled={idx === 0}
-                          style={{ padding: '4px', background: idx === 0 ? '#f1f5f9' : '#e0f2fe', color: idx === 0 ? '#cbd5e1' : '#0284c7', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: idx === 0 ? 'not-allowed' : 'pointer' }}
+                          style={{ padding: '4px', background: idx === 0 ? '#f1f5f9' : '#ecfdf5', color: idx === 0 ? '#cbd5e1' : '#15803d', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: idx === 0 ? 'not-allowed' : 'pointer' }}
                           title="Naikkan Urutan Tampilan Poli di TV"
                         >
                           <ArrowUp size={14} />
@@ -823,7 +797,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         <button
                           onClick={() => handleMoveClinic(idx, 1)}
                           disabled={idx === clinicList.length - 1}
-                          style={{ padding: '4px', background: idx === clinicList.length - 1 ? '#f1f5f9' : '#e0f2fe', color: idx === clinicList.length - 1 ? '#cbd5e1' : '#0284c7', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: idx === clinicList.length - 1 ? 'not-allowed' : 'pointer' }}
+                          style={{ padding: '4px', background: idx === clinicList.length - 1 ? '#f1f5f9' : '#ecfdf5', color: idx === clinicList.length - 1 ? '#cbd5e1' : '#15803d', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: idx === clinicList.length - 1 ? 'not-allowed' : 'pointer' }}
                           title="Turunkan Urutan Tampilan Poli di TV"
                         >
                           <ArrowDown size={14} />
@@ -872,9 +846,9 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                                 border: '1px solid',
                                 cursor: 'pointer',
                                 fontWeight: '800',
-                                borderColor: isActiveDay ? '#0284c7' : '#cbd5e1',
-                                background: isActiveDay ? '#e0f2fe' : '#f8fafc',
-                                color: isActiveDay ? '#0369a1' : '#94a3b8'
+                                borderColor: isActiveDay ? '#15803d' : '#cbd5e1',
+                                background: isActiveDay ? '#ecfdf5' : '#f8fafc',
+                                color: isActiveDay ? '#166534' : '#94a3b8'
                               }}
                               title={`Klik untuk mengaktifkan/mematikan jadwal poli pada hari ${day}`}
                             >
@@ -928,7 +902,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
             {/* 1. LOGO RUMAH SAKIT */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1.25rem', borderRadius: '14px' }}>
               <label style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem' }}>
-                <Image size={20} style={{ color: '#0284c7' }} />
+                <Image size={20} style={{ color: '#15803d' }} />
                 <span>Logo Rumah Sakit / Instansi</span>
               </label>
 
@@ -966,7 +940,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                     <label
                       htmlFor="hospital-logo-file"
                       className="btn-primary"
-                      style={{ cursor: 'pointer', background: '#0284c7', padding: '8px 16px', fontSize: '0.85rem' }}
+                      style={{ cursor: 'pointer', background: '#15803d', padding: '8px 16px', fontSize: '0.85rem' }}
                     >
                       <Upload size={16} /> Upload Logo Gambar
                     </label>
@@ -1021,7 +995,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <label style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Film size={20} style={{ color: '#0284c7' }} />
+                    <Film size={20} style={{ color: '#15803d' }} />
                     <span>Daftar Video Promosi TV Display (Playlist Auto-Loop)</span>
                   </label>
                   <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
@@ -1041,7 +1015,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                   <label
                     htmlFor="video-files-input"
                     className="btn-primary"
-                    style={{ cursor: 'pointer', background: '#0284c7', padding: '8px 16px', fontSize: '0.85rem' }}
+                    style={{ cursor: 'pointer', background: '#15803d', padding: '8px 16px', fontSize: '0.85rem' }}
                   >
                     <FileVideo size={16} /> 📁 Upload File Video (.mp4 / .webm)
                   </label>
@@ -1055,6 +1029,97 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                   </button>
                 </div>
               </div>
+
+              {/* Quick Duration Toolbar for Playlist */}
+              {videoList.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  flexWrap: 'wrap',
+                  background: '#f8fafc',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  marginBottom: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: '800', color: '#334155' }}>
+                    <Clock size={15} color="#15803d" />
+                    <span>Atur Cepat Durasi Playlist:</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSetAllVideosDuration(0)}
+                      style={{
+                        fontSize: '0.73rem',
+                        fontWeight: '700',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        border: '1px solid #bbf7d0',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Putar semua video hingga selesai tanpa terpotong"
+                    >
+                      <RefreshCw size={12} /> Semua: Sampai Selesai
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetAllVideosDuration(60)}
+                      style={{
+                        fontSize: '0.73rem',
+                        fontWeight: '700',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        background: 'white',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⏱️ Semua: 1 Menit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetAllVideosDuration(120)}
+                      style={{
+                        fontSize: '0.73rem',
+                        fontWeight: '700',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        background: 'white',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⏱️ Semua: 2 Menit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetAllVideosDuration(300)}
+                      style={{
+                        fontSize: '0.73rem',
+                        fontWeight: '700',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        background: 'white',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⏱️ Semua: 5 Menit
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Video Playlist Cards Grid */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1076,7 +1141,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         border: '1px solid #cbd5e1',
                         boxShadow: '0 2px 5px rgba(0,0,0,0.03)'
                       }}>
-                        <span style={{ fontWeight: '900', color: '#0284c7', fontSize: '0.9rem', width: '28px' }}>
+                        <span style={{ fontWeight: '900', color: '#15803d', fontSize: '0.9rem', width: '28px' }}>
                           #{idx + 1}
                         </span>
 
@@ -1113,7 +1178,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                             position: 'absolute',
                             bottom: '2px',
                             right: '2px',
-                            background: parsed.type === 'youtube' ? '#dc2626' : parsed.type === 'tiktok' ? '#000000' : parsed.type === 'instagram' ? '#c13584' : parsed.type === 'gdrive' ? '#0284c7' : '#0d9488',
+                            background: parsed.type === 'youtube' ? '#dc2626' : parsed.type === 'tiktok' ? '#000000' : parsed.type === 'instagram' ? '#c13584' : parsed.type === 'gdrive' ? '#15803d' : '#0d9488',
                             color: 'white',
                             fontSize: '0.55rem',
                             fontWeight: '900',
@@ -1142,8 +1207,8 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                               fontWeight: '800',
                               padding: '2px 8px',
                               borderRadius: '6px',
-                              background: parsed.type === 'youtube' ? '#fee2e2' : parsed.type === 'tiktok' ? '#000000' : parsed.type === 'instagram' ? '#fdf2f8' : parsed.type === 'gdrive' ? '#e0f2fe' : '#f1f5f9',
-                              color: parsed.type === 'youtube' ? '#b91c1c' : parsed.type === 'tiktok' ? '#ffffff' : parsed.type === 'instagram' ? '#be185d' : parsed.type === 'gdrive' ? '#0369a1' : '#475569',
+                              background: parsed.type === 'youtube' ? '#fee2e2' : parsed.type === 'tiktok' ? '#000000' : parsed.type === 'instagram' ? '#fdf2f8' : parsed.type === 'gdrive' ? '#ecfdf5' : '#f1f5f9',
+                              color: parsed.type === 'youtube' ? '#b91c1c' : parsed.type === 'tiktok' ? '#ffffff' : parsed.type === 'instagram' ? '#be185d' : parsed.type === 'gdrive' ? '#166534' : '#475569',
                               border: parsed.type === 'tiktok' ? '1px solid #334155' : parsed.type === 'instagram' ? '1px solid #fbcfe8' : 'none'
                             }}>
                               {parsed.type === 'youtube' ? 'YouTube' : parsed.type === 'tiktok' ? 'TikTok' : parsed.type === 'instagram' ? 'Instagram' : parsed.type === 'gdrive' ? 'Google Drive' : 'File MP4'}
@@ -1153,25 +1218,65 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                             <div style={{ fontSize: '0.75rem', color: '#64748b', wordBreak: 'break-all', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '320px' }}>
                               Source: {vid.url.length > 70 ? `${vid.url.substr(0, 70)}...` : vid.url}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '3px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                              <Clock size={13} style={{ color: '#0284c7' }} />
-                              <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#475569' }}>Durasi:</span>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: (!vid.duration || vid.duration === 0) ? '#f0fdf4' : '#f8fafc',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              border: (!vid.duration || vid.duration === 0) ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
+                            }}>
+                              <Clock size={13} style={{ color: (!vid.duration || vid.duration === 0) ? '#16a34a' : '#15803d' }} />
+                              <span style={{ fontSize: '0.72rem', fontWeight: '800', color: (!vid.duration || vid.duration === 0) ? '#15803d' : '#475569' }}>
+                                Durasi:
+                              </span>
                               <select
-                                value={vid.duration || 30}
+                                value={[0, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800].includes(vid.duration ?? 0) ? (vid.duration ?? 0) : 'custom'}
                                 onChange={(e) => {
-                                  const d = parseInt(e.target.value);
-                                  setVideoList(videoList.map(v => v.id === vid.id ? { ...v, duration: d } : v));
+                                  const val = e.target.value;
+                                  if (val === 'custom') {
+                                    const inputVal = prompt('Masukkan durasi video dalam satuan detik (contoh: 240 untuk 4 menit, atau 0 untuk sampai selesai):', vid.duration || 60);
+                                    if (inputVal !== null) {
+                                      const parsedD = parseInt(inputVal);
+                                      if (!isNaN(parsedD) && parsedD >= 0) {
+                                        setVideoList(videoList.map(v => v.id === vid.id ? { ...v, duration: parsedD } : v));
+                                      }
+                                    }
+                                  } else {
+                                    const d = parseInt(val);
+                                    setVideoList(videoList.map(v => v.id === vid.id ? { ...v, duration: d } : v));
+                                  }
                                 }}
-                                style={{ fontSize: '0.72rem', fontWeight: '800', border: 'none', background: 'transparent', color: '#0f172a', cursor: 'pointer' }}
+                                style={{
+                                  fontSize: '0.73rem',
+                                  fontWeight: '800',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: (!vid.duration || vid.duration === 0) ? '#15803d' : '#0f172a',
+                                  cursor: 'pointer'
+                                }}
                               >
+                                <option value={0}>🔄 Putar Sampai Selesai (Otomatis)</option>
                                 <option value={15}>15 dtk</option>
                                 <option value={20}>20 dtk</option>
-                                <option value={30}>30 dtk (Standar)</option>
+                                <option value={30}>30 dtk</option>
                                 <option value={45}>45 dtk</option>
                                 <option value={60}>60 dtk (1 mnt)</option>
                                 <option value={90}>90 dtk (1.5 mnt)</option>
                                 <option value={120}>120 dtk (2 mnt)</option>
+                                <option value={180}>180 dtk (3 mnt)</option>
+                                <option value={300}>300 dtk (5 mnt)</option>
+                                <option value={600}>600 dtk (10 mnt)</option>
+                                <option value={900}>900 dtk (15 mnt)</option>
+                                <option value={1800}>1800 dtk (30 mnt)</option>
+                                <option value="custom">⏱️ Kustom (Ketik Detik)...</option>
                               </select>
+                              {![0, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800].includes(vid.duration ?? 0) && (
+                                <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#15803d', background: '#ecfdf5', padding: '1px 5px', borderRadius: '4px' }}>
+                                  ({vid.duration}s)
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1202,7 +1307,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1.25rem', borderRadius: '14px' }}>
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sliders size={20} style={{ color: '#0284c7' }} />
+                  <Sliders size={20} style={{ color: '#15803d' }} />
                   <span>Ukuran & Tata Letak Media Promosi TV (Paten)</span>
                 </label>
                 <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
@@ -1310,14 +1415,14 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                       {/* Video Left */}
                       <div style={{
                         flex: displaySettings.layoutRatio === '60-40' ? '4' : displaySettings.layoutRatio === '40-60' ? '6' : displaySettings.layoutRatio === '70-30' ? '3' : '5',
-                        background: '#0284c7',
+                        background: 'linear-gradient(135deg, #15803d, #166534)',
                         borderRadius: '6px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         padding: '4px',
-                        border: '1px solid #38bdf8'
+                        border: '1px solid #eab308'
                       }}>
                         <span style={{ fontSize: '1.2rem' }}>🎬</span>
                         <span style={{ fontSize: '0.75rem', fontWeight: '900' }}>Media Promosi</span>
@@ -1359,14 +1464,14 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                       {/* Video Right */}
                       <div style={{
                         flex: displaySettings.layoutRatio === '60-40' ? '4' : displaySettings.layoutRatio === '40-60' ? '6' : displaySettings.layoutRatio === '70-30' ? '3' : '5',
-                        background: '#0284c7',
+                        background: 'linear-gradient(135deg, #15803d, #166534)',
                         borderRadius: '6px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         padding: '4px',
-                        border: '1px solid #38bdf8'
+                        border: '1px solid #eab308'
                       }}>
                         <span style={{ fontSize: '1.2rem' }}>🎬</span>
                         <span style={{ fontSize: '0.75rem', fontWeight: '900' }}>Media Promosi</span>
@@ -1383,7 +1488,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <label style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sparkles size={20} style={{ color: '#0284c7' }} />
+                    <Sparkles size={20} style={{ color: '#15803d' }} />
                     <span>Kartu Tampilan Informasi TV (Tampil Otomatis Jika Video Crash / Tanpa Video)</span>
                   </label>
                   <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
@@ -1414,7 +1519,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                     gap: '10px'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-                      <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0284c7', background: '#e0f2fe', padding: '2px 10px', borderRadius: '8px' }}>
+                      <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#15803d', background: '#ecfdf5', padding: '2px 10px', borderRadius: '8px' }}>
                         SLIDE KARTU #{idx + 1}
                       </span>
                       <button
@@ -1518,7 +1623,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
             <div className="admin-card">
               <div className="admin-card-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Printer size={20} color="#0284c7" /> Pengaturan Format Struk Thermal
+                  <Printer size={20} color="#15803d" /> Pengaturan Format Struk Thermal
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
                   Sesuaikan ukuran kertas, ukuran font, logo, dan konten struk yang dicetak di Kiosk antrean.
@@ -1538,9 +1643,9 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                       style={{
                         padding: '1rem',
                         borderRadius: '12px',
-                        border: printSettings.paperWidth === '58mm' ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                        background: printSettings.paperWidth === '58mm' ? '#e0f2fe' : '#f8fafc',
-                        color: printSettings.paperWidth === '58mm' ? '#0369a1' : '#475569',
+                        border: printSettings.paperWidth === '58mm' ? '2px solid #15803d' : '1px solid #cbd5e1',
+                        background: printSettings.paperWidth === '58mm' ? '#ecfdf5' : '#f8fafc',
+                        color: printSettings.paperWidth === '58mm' ? '#166534' : '#475569',
                         fontWeight: '800',
                         cursor: 'pointer',
                         textAlign: 'left'
@@ -1556,9 +1661,9 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                       style={{
                         padding: '1rem',
                         borderRadius: '12px',
-                        border: printSettings.paperWidth === '80mm' ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                        background: printSettings.paperWidth === '80mm' ? '#e0f2fe' : '#f8fafc',
-                        color: printSettings.paperWidth === '80mm' ? '#0369a1' : '#475569',
+                        border: printSettings.paperWidth === '80mm' ? '2px solid #15803d' : '1px solid #cbd5e1',
+                        background: printSettings.paperWidth === '80mm' ? '#ecfdf5' : '#f8fafc',
+                        color: printSettings.paperWidth === '80mm' ? '#166534' : '#475569',
                         fontWeight: '800',
                         cursor: 'pointer',
                         textAlign: 'left'
@@ -1588,9 +1693,9 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         style={{
                           padding: '0.75rem 0.5rem',
                           borderRadius: '10px',
-                          border: printSettings.fontSize === f.id ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                          background: printSettings.fontSize === f.id ? '#e0f2fe' : '#f8fafc',
-                          color: printSettings.fontSize === f.id ? '#0369a1' : '#475569',
+                          border: printSettings.fontSize === f.id ? '2px solid #15803d' : '1px solid #cbd5e1',
+                          background: printSettings.fontSize === f.id ? '#ecfdf5' : '#f8fafc',
+                          color: printSettings.fontSize === f.id ? '#166534' : '#475569',
                           fontWeight: '800',
                           cursor: 'pointer',
                           textAlign: 'center'
@@ -1631,7 +1736,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                     <div style={{ marginTop: '0.75rem', paddingLeft: '26px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                         <span>Tinggi Logo Struk:</span>
-                        <span style={{ color: '#0284c7' }}>{printSettings.logoHeight || 60} px</span>
+                        <span style={{ color: '#15803d' }}>{printSettings.logoHeight || 60} px</span>
                       </div>
                       <input
                         type="range"
@@ -1754,14 +1859,14 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            background: '#0284c7',
+                            background: '#15803d',
                             color: 'white',
                             padding: '6px 14px',
                             borderRadius: '8px',
                             fontSize: '0.78rem',
                             fontWeight: '700',
                             textDecoration: 'none',
-                            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
+                            boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
                           }}
                         >
                           <Download size={14} /> Unduh Windows Print Bridge (.zip)
@@ -1920,38 +2025,38 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Header & Role Info */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-            <div style={{ background: '#e0f2fe', padding: '1rem', borderRadius: '14px', border: '1px solid #bae6fd' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#0369a1', marginBottom: '4px' }}>
+            <div style={{ background: '#ecfdf5', padding: '1rem', borderRadius: '14px', border: '1px solid #a7f3d0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#15803d', marginBottom: '4px' }}>
                 <Ticket size={18} /> PENDAFTARAN
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#0c4a6e', lineHeight: 1.4 }}>
+              <div style={{ fontSize: '0.8rem', color: '#166534', lineHeight: 1.4 }}>
                 Berhak membuka & mengoperasikan <strong>Layar Kiosk Pasien</strong> (Ambil Nomor Antrean).
               </div>
             </div>
 
-            <div style={{ background: '#ccfbf1', padding: '1rem', borderRadius: '14px', border: '1px solid #99f6e4' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#0f766e', marginBottom: '4px' }}>
+            <div style={{ background: '#f0fdf4', padding: '1rem', borderRadius: '14px', border: '1px solid #bbf7d0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#16a34a', marginBottom: '4px' }}>
                 <UserCheck size={18} /> POLIKLINIK
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#134e4a', lineHeight: 1.4 }}>
+              <div style={{ fontSize: '0.8rem', color: '#14532d', lineHeight: 1.4 }}>
                 Berhak membuka <strong>Layar Petugas</strong> untuk memanggil & melayani antrean pasien poli.
               </div>
             </div>
 
-            <div style={{ background: '#fef3c7', padding: '1rem', borderRadius: '14px', border: '1px solid #fde68a' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#b45309', marginBottom: '4px' }}>
+            <div style={{ background: '#fefce8', padding: '1rem', borderRadius: '14px', border: '1px solid #fef08a' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#ca8a04', marginBottom: '4px' }}>
                 <Shield size={18} /> FARMASI
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#78350f', lineHeight: 1.4 }}>
+              <div style={{ fontSize: '0.8rem', color: '#854d0e', lineHeight: 1.4 }}>
                 Berhak membuka <strong>Layar Petugas</strong> khusus bagian Farmasi & Depo Apotek.
               </div>
             </div>
 
-            <div style={{ background: '#ede9fe', padding: '1rem', borderRadius: '14px', border: '1px solid #ddd6fe' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#6d28d9', marginBottom: '4px' }}>
+            <div style={{ background: '#fef3c7', padding: '1rem', borderRadius: '14px', border: '1px solid #fde68a' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#d97706', marginBottom: '4px' }}>
                 <ShieldCheck size={18} /> ADMINISTRATOR
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#4c1d95', lineHeight: 1.4 }}>
+              <div style={{ fontSize: '0.8rem', color: '#78350f', lineHeight: 1.4 }}>
                 Akses penuh mengubah semua data, pengaturan sistem, media TV, tiket, & pengguna.
               </div>
             </div>
@@ -2002,20 +2107,20 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                       let roleLabel = u.role;
 
                       if (u.role === 'ADMIN') {
-                        badgeBg = '#ede9fe';
-                        badgeColor = '#6d28d9';
+                        badgeBg = '#fef3c7';
+                        badgeColor = '#d97706';
                         roleLabel = 'ADMINISTRATOR';
                       } else if (u.role === 'PENDAFTARAN') {
-                        badgeBg = '#e0f2fe';
-                        badgeColor = '#0369a1';
+                        badgeBg = '#ecfdf5';
+                        badgeColor = '#15803d';
                         roleLabel = 'PETUGAS PENDAFTARAN';
                       } else if (u.role === 'POLIKLINIK') {
-                        badgeBg = '#ccfbf1';
-                        badgeColor = '#0f766e';
+                        badgeBg = '#f0fdf4';
+                        badgeColor = '#16a34a';
                         roleLabel = 'PETUGAS POLIKLINIK';
                       } else if (u.role === 'FARMASI') {
-                        badgeBg = '#fef3c7';
-                        badgeColor = '#b45309';
+                        badgeBg = '#fefce8';
+                        badgeColor = '#ca8a04';
                         roleLabel = 'PETUGAS FARMASI';
                       }
 
@@ -2044,7 +2149,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                             {assignedClinics.length > 0 ? (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                                 {assignedClinics.map(c => (
-                                  <span key={c.id} style={{ fontSize: '0.75rem', fontWeight: '800', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px' }}>
+                                  <span key={c.id} style={{ fontSize: '0.75rem', fontWeight: '800', background: '#ecfdf5', color: '#15803d', padding: '2px 8px', borderRadius: '6px' }}>
                                     [{c.prefix}] {c.name}
                                   </span>
                                 ))}
@@ -2199,7 +2304,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         setUserForm({ ...userForm, assignedClinicIds: clinicList.map(c => c.id) });
                       }
                     }}
-                    style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ background: 'none', border: 'none', color: '#15803d', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
                   >
                     {userForm.assignedClinicIds.length === clinicList.length ? 'Batal Pilih Semua' : 'Pilih Semua Poli'}
                   </button>
@@ -2227,12 +2332,12 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                           gap: '8px',
                           padding: '7px 10px',
                           borderRadius: '8px',
-                          background: isChecked ? '#e0f2fe' : '#ffffff',
-                          border: isChecked ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                          background: isChecked ? '#ecfdf5' : '#ffffff',
+                          border: isChecked ? '1.5px solid #15803d' : '1px solid #e2e8f0',
                           cursor: 'pointer',
                           fontSize: '0.82rem',
                           fontWeight: isChecked ? '800' : '600',
-                          color: isChecked ? '#0369a1' : '#334155',
+                          color: isChecked ? '#166534' : '#334155',
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -2252,7 +2357,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                               });
                             }
                           }}
-                          style={{ cursor: 'pointer', accentColor: '#0284c7', width: '16px', height: '16px' }}
+                          style={{ cursor: 'pointer', accentColor: '#15803d', width: '16px', height: '16px' }}
                         />
                         <span>[{cli.prefix}] {cli.name}</span>
                       </label>
@@ -2310,7 +2415,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
           <div className="modal-card" style={{ maxWidth: '540px', width: '92%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Film size={22} style={{ color: '#0284c7' }} />
+                <Film size={22} style={{ color: '#15803d' }} />
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800' }}>Tambah Video Promosi dari Link</h3>
               </div>
               <button
@@ -2355,23 +2460,46 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                  Durasi Putar Sebelum Berganti (Detik)
+                  ⏱️ Pengaturan Durasi Putar Video
                 </label>
                 <select
                   value={videoModalDuration}
-                  onChange={(e) => setVideoModalDuration(parseInt(e.target.value))}
+                  onChange={(e) => setVideoModalDuration(e.target.value === 'custom' ? 'custom' : parseInt(e.target.value))}
                   style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: '700' }}
                 >
+                  <option value={0}>🔄 Putar Sampai Selesai (Otomatis - Tidak Terpotong)</option>
                   <option value={15}>15 detik</option>
                   <option value={20}>20 detik</option>
-                  <option value={30}>30 detik (Standar Rekomendasi)</option>
+                  <option value={30}>30 detik</option>
                   <option value={45}>45 detik</option>
                   <option value={60}>60 detik (1 menit)</option>
                   <option value={90}>90 detik (1.5 menit)</option>
                   <option value={120}>120 detik (2 menit)</option>
+                  <option value={180}>180 detik (3 menit)</option>
+                  <option value={300}>300 detik (5 menit)</option>
+                  <option value={600}>600 detik (10 menit)</option>
+                  <option value={900}>900 detik (15 menit)</option>
+                  <option value={1800}>1800 detik (30 menit)</option>
+                  <option value="custom">⏱️ Kustom (Ketik Detik Sendiri)...</option>
                 </select>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
-                  Video akan otomatis berganti ke video berikutnya setelah durasi ini tercapai (untuk YouTube akan langsung berganti saat video selesai).
+
+                {videoModalDuration === 'custom' && (
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="number"
+                      min="5"
+                      max="7200"
+                      value={customModalDuration}
+                      onChange={(e) => setCustomModalDuration(e.target.value)}
+                      placeholder="Contoh: 240 (untuk 4 menit)"
+                      style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                    />
+                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569' }}>Detik</span>
+                  </div>
+                )}
+
+                <div style={{ fontSize: '0.75rem', color: '#15803d', background: '#ecfdf5', padding: '6px 10px', borderRadius: '6px', border: '1px solid #a7f3d0', marginTop: '6px', lineHeight: 1.4 }}>
+                  💡 <strong>Rekomendasi:</strong> Pilih <strong>"Putar Sampai Selesai (Otomatis)"</strong> agar video dari link YouTube / file video diputar penuh sampai video selesai tanpa terpotong di tengah jalan.
                 </div>
               </div>
 

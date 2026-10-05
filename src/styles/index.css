@@ -2,43 +2,83 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Outfit', 'Inter', sans-serif;
 
-  /* Palette - Modern Medical Cyan/Teal & Dark Slate */
-  --primary: #0284c7;
-  --primary-hover: #0369a1;
-  --primary-light: #e0f2fe;
+  /* Palette - Hijau Emerald / Forest Green & Aksen Emas / Gold */
+  --primary: #15803d;
+  --primary-hover: #166534;
+  --primary-light: #ecfdf5;
+  --primary-gradient: linear-gradient(135deg, #15803d 0%, #16a34a 60%, #15803d 100%);
   
-  --secondary: #0d9488;
-  --secondary-hover: #0f766e;
+  --secondary: #0f766e;
+  --secondary-hover: #115e59;
   
-  --accent: #6366f1;
+  --gold: #d97706;
+  --gold-bright: #eab308;
+  --gold-light: #fefce8;
+  --gold-border: #fde047;
+  --gold-gradient: linear-gradient(135deg, #f59e0b 0%, #eab308 50%, #d97706 100%);
+
+  --accent: #eab308;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
   
-  --bg-main: #f8fafc;
+  --bg-main: #f8faf8;
   --bg-card: #ffffff;
   --text-main: #0f172a;
-  --text-muted: #64748b;
+  --text-muted: #475569;
   --border: #e2e8f0;
 
   /* TV Light Theme Tokens */
-  --tv-bg: #f0f9ff;
+  --tv-bg: #f4fbf5;
   --tv-card: #ffffff;
-  --tv-card-border: #cbd5e1;
+  --tv-card-border: #bbf7d0;
   --tv-text: #0f172a;
-  --tv-text-muted: #475569;
-  --tv-accent: #0284c7;
-  --tv-glow: rgba(2, 132, 199, 0.15);
+  --tv-text-muted: #334155;
+  --tv-accent: #15803d;
+  --tv-gold: #d97706;
+  --tv-glow: rgba(21, 128, 61, 0.2);
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 30px;
+  --radius-sm: 5%;
+  --radius-md: 5%;
+  --radius-lg: 5%;
+  --radius-xl: 5%;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 30px rgba(2, 132, 199, 0.3);
+  --shadow-md: 0 4px 12px rgba(21, 128, 61, 0.08);
+  --shadow-lg: 0 10px 25px rgba(21, 128, 61, 0.12);
+  --shadow-glow: 0 0 30px rgba(21, 128, 61, 0.25);
+  --shadow-gold: 0 0 20px rgba(234, 179, 8, 0.35);
+}
+
+/* Border radius 5% pada tiap elemen UI antarmuka */
+.brand-logo,
+.view-btn,
+.status-badge,
+.clinic-card,
+.clinic-badge,
+.quota-pill,
+.take-ticket-btn,
+.ticket-paper,
+.stat-card,
+.stat-icon,
+.card,
+.table-responsive,
+.modal-box,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+button,
+input,
+select,
+textarea,
+[style*="border-radius"] {
+  border-radius: 5% !important;
+}
+
+/* Pertahankan elemen lingkaran bulat sempurna */
+.status-dot,
+[style*="50%"] {
+  border-radius: 50% !important;
 }
 
 * {
@@ -62,13 +102,13 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1.5rem;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid #eab308;
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 10px rgba(21, 128, 61, 0.08);
 }
 
 .brand {
@@ -80,7 +120,8 @@ body {
 .brand-logo {
   width: 42px;
   height: 42px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  background: linear-gradient(135deg, #15803d, #16a34a);
+  border: 1.5px solid #eab308;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -88,7 +129,7 @@ body {
   color: white;
   font-weight: 800;
   font-size: 1.25rem;
-  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
+  box-shadow: 0 4px 10px rgba(234, 179, 8, 0.25);
 }
 
 .brand-text h1 {
@@ -132,8 +173,10 @@ body {
 
 .view-btn.active {
   background: white;
-  color: var(--primary);
+  color: #15803d;
+  border-bottom: 2px solid #eab308;
   box-shadow: var(--shadow-sm);
+  font-weight: 800;
 }
 
 .status-badge {
@@ -141,11 +184,12 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   padding: 4px 10px;
   border-radius: 20px;
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #ecfdf5;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .status-dot {
@@ -183,7 +227,7 @@ body {
   font-family: var(--font-heading);
   font-size: 2.25rem;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--text-main), var(--primary));
+  background: linear-gradient(135deg, #14532d, #16a34a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 0.5rem;
@@ -217,8 +261,8 @@ body {
 
 .clinic-card:hover:not(.disabled) {
   transform: translateY(-4px);
-  border-color: var(--primary);
-  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  border-color: #15803d;
+  box-shadow: var(--shadow-lg), var(--shadow-gold);
 }
 
 .clinic-card.disabled {
@@ -232,8 +276,9 @@ body {
   width: 50px;
   height: 50px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--primary-light), #bae6fd);
-  color: var(--primary);
+  background: linear-gradient(135deg, #ecfdf5, #fefce8);
+  color: #15803d;
+  border: 1.5px solid #fde047;
   font-family: var(--font-heading);
   font-weight: 800;
   font-size: 1.5rem;
@@ -245,6 +290,7 @@ body {
 .clinic-card.disabled .clinic-badge {
   background: #cbd5e1;
   color: #64748b;
+  border-color: #cbd5e1;
 }
 
 .clinic-info h3 {
@@ -276,18 +322,20 @@ body {
   border-radius: 12px;
   background: #ecfdf5;
   color: #047857;
+  border: 1px solid #bbf7d0;
 }
 
 .quota-pill.full {
   background: #fef2f2;
   color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 .take-ticket-btn {
   min-height: 52px; /* standard 44px+ touch target */
   border-radius: var(--radius-md);
-  border: none;
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  border: 1.5px solid #eab308;
+  background: linear-gradient(135deg, #15803d, #16a34a);
   color: white;
   font-size: 1.1rem;
   font-weight: 700;
@@ -296,24 +344,26 @@ body {
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.25);
   transition: all 0.2s ease;
 }
 
 .take-ticket-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--primary-hover), #0284c7);
-  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.4);
+  background: linear-gradient(135deg, #166534, #15803d);
+  border-color: #fde047;
+  box-shadow: 0 6px 18px rgba(234, 179, 8, 0.35);
 }
 
 .take-ticket-btn:disabled {
   background: #94a3b8;
   cursor: not-allowed;
   box-shadow: none;
+  border-color: #cbd5e1;
 }
 
 /* TV DISPLAY VIEW (Full HD TV Layout) */
 .tv-layout {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
+  background: linear-gradient(135deg, #f4fbf5 0%, #ecfdf5 50%, #fefce8 100%);
   color: var(--tv-text);
   min-height: calc(100vh - 65px);
   display: flex;
@@ -326,8 +376,8 @@ body {
   align-items: center;
   padding: 1.25rem 2.5rem;
   background: #ffffff;
-  border-bottom: 2px solid #e2e8f0;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+  border-bottom: 3px solid #eab308;
+  box-shadow: 0 4px 15px rgba(21, 128, 61, 0.06);
 }
 
 .tv-hospital-name {
@@ -344,10 +394,12 @@ body {
   font-family: var(--font-heading);
   font-size: 2rem;
   font-weight: 800;
-  color: #0284c7;
-  background: #e0f2fe;
+  color: #15803d;
+  background: #ecfdf5;
+  border: 1.5px solid #fde047;
   padding: 6px 20px;
   border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(234, 179, 8, 0.15);
 }
 
 .tv-body {
@@ -367,14 +419,14 @@ body {
 }
 
 .current-call-card {
-  background: linear-gradient(135deg, #0284c7, #0f766e);
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%);
   border-radius: var(--radius-xl);
   padding: 2.25rem 2rem;
   text-align: center;
-  box-shadow: 0 0 35px rgba(2, 132, 199, 0.4);
+  box-shadow: 0 0 35px rgba(234, 179, 8, 0.35);
   position: relative;
   overflow: hidden;
-  border: 2px solid #38bdf8;
+  border: 3px solid #eab308;
   animation: pulse-call 2s infinite ease-in-out;
   flex: 1.1;
   min-height: 360px;
@@ -385,15 +437,15 @@ body {
 }
 
 @keyframes pulse-call {
-  0%, 100% { box-shadow: 0 0 25px rgba(56, 189, 248, 0.3); }
-  50% { box-shadow: 0 0 50px rgba(56, 189, 248, 0.7); }
+  0%, 100% { box-shadow: 0 0 20px rgba(234, 179, 8, 0.3); }
+  50% { box-shadow: 0 0 45px rgba(234, 179, 8, 0.6); }
 }
 
 .current-call-label {
   font-size: 1.35rem;
   text-transform: uppercase;
   letter-spacing: 3px;
-  color: #e0f2fe;
+  color: #fef08a;
   font-weight: 800;
   margin-bottom: 0.5rem;
 }
@@ -412,7 +464,7 @@ body {
   font-family: var(--font-heading);
   font-size: 2.25rem;
   font-weight: 800;
-  color: #bae6fd;
+  color: #fde047;
 }
 
 .tv-queue-grid {
@@ -475,7 +527,8 @@ body {
 }
 
 .tv-marquee {
-  background: #0284c7;
+  background: linear-gradient(90deg, #15803d, #166534);
+  border-top: 3px solid #eab308;
   color: white;
   padding: 0.85rem 0;
   font-size: 1.25rem;
@@ -577,8 +630,8 @@ body {
   color: white;
 }
 
-.btn-action.btn-next { background: #0284c7; }
-.btn-action.btn-next:hover { background: #0369a1; }
+.btn-action.btn-next { background: #15803d; }
+.btn-action.btn-next:hover { background: #166534; }
 
 .btn-action.btn-recall { background: #0d9488; }
 .btn-action.btn-recall:hover { background: #0f766e; }
@@ -846,18 +899,22 @@ body {
 .btn-primary {
   padding: 0.6rem 1.2rem;
   border-radius: var(--radius-md);
-  background: var(--primary);
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
   color: white;
-  border: none;
-  font-weight: 600;
+  border: 1px solid #eab308;
+  font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  box-shadow: 0 3px 10px rgba(21, 128, 61, 0.2);
+  transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
-  background: var(--primary-hover);
+  background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+  border-color: #fde047;
+  box-shadow: 0 5px 14px rgba(234, 179, 8, 0.3);
 }
 
 .btn-danger {

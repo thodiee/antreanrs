@@ -14,11 +14,12 @@ export function parseVideoUrl(rawUrl, isMuted = false, shouldLoop = false) {
   if (ytMatch && ytMatch[1]) {
     const videoId = ytMatch[1];
     const ytLoop = shouldLoop ? `&loop=1&playlist=${videoId}` : '&loop=0';
+    const originParam = typeof window !== 'undefined' && window.location?.origin ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
     return {
       type: 'youtube',
       videoId,
       // enablejsapi=1 allows parent window to detect onStateChange=0 (ENDED) and unMute with audio
-      embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muteFlag}${ytLoop}&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muteFlag}${ytLoop}&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1${originParam}`,
       thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
       originalUrl: url
     };

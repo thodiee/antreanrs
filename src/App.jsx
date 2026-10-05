@@ -40,7 +40,7 @@ class ErrorBoundary extends React.Component {
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               onClick={() => window.location.reload()}
-              style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+              style={{ background: '#15803d', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
             >
               🔄 Muat Ulang Halaman
             </button>
@@ -381,15 +381,15 @@ export default function App() {
           </button>
 
           {currentUser ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#e0f2fe', padding: '4px 12px', borderRadius: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ecfdf5', border: '1.5px solid #fde047', padding: '4px 12px', borderRadius: '20px', boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)' }}>
               {currentUser.role === 'ADMIN' ? (
-                <ShieldCheck size={16} style={{ color: '#0369a1' }} />
+                <ShieldCheck size={16} style={{ color: '#15803d' }} />
               ) : currentUser.role === 'PENDAFTARAN' ? (
-                <Ticket size={16} style={{ color: '#0284c7' }} />
+                <Ticket size={16} style={{ color: '#15803d' }} />
               ) : (
                 <User size={16} style={{ color: '#0d9488' }} />
               )}
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#0f172a' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#14532d' }}>
                 {currentUser.name} ({currentUser.role})
               </span>
               <button

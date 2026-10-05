@@ -144,7 +144,7 @@ async function resolveVideoRedirect(url) {
 // Helper to load full current database state
 async function getFullState() {
   const [hospitals] = await pool.query('SELECT name, tagline, running_text AS runningText, logo, print_settings AS printSettings, display_settings AS displaySettings FROM hospitals LIMIT 1');
-  const [videos] = await pool.query('SELECT id, title, url, COALESCE(duration, 30) AS duration FROM videos');
+  const [videos] = await pool.query('SELECT id, title, url, COALESCE(duration, 0) AS duration FROM videos');
   
   // Auto-resolve any short TikTok links in database
   for (const v of videos) {
@@ -621,7 +621,7 @@ async function processSaveSettings(payload) {
     for (const v of payload.videos) {
       if (v.title && v.url) {
         const saveUrl = await resolveVideoRedirect(v.url);
-        const durationVal = v.duration && !isNaN(parseInt(v.duration)) ? parseInt(v.duration) : 30;
+        const durationVal = (v.duration !== undefined && v.duration !== null && !isNaN(parseInt(v.duration))) ? parseInt(v.duration) : 0;
         await pool.query(
           `INSERT INTO videos (id, title, url, duration) VALUES (?, ?, ?, ?)`,
           [v.id || `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, v.title, saveUrl, durationVal]

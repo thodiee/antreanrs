@@ -59,11 +59,7 @@ export default function LoginForm({ targetRole, hospital, onLoginSuccess }) {
         icon: <Ticket size={28} />,
         title: 'Login Petugas Pendaftaran',
         subtitle: 'Hak akses membuka Layar Kiosk Pasien (Ambil Tiket)',
-        bg: 'linear-gradient(135deg, #0284c7, #0369a1)',
-        quickUsers: [
-          { label: 'Petugas Pendaftaran', user: 'pendaftaran', pass: 'pendaftaran123' },
-          { label: 'Admin', user: 'admin', pass: 'admin123' }
-        ]
+        bg: 'linear-gradient(135deg, #15803d, #166534)'
       };
     }
     if (targetRole === 'OFFICER') {
@@ -71,22 +67,14 @@ export default function LoginForm({ targetRole, hospital, onLoginSuccess }) {
         icon: <UserCheck size={28} />,
         title: 'Login Petugas (Poli & Farmasi)',
         subtitle: 'Hak akses membuka Layar Pemanggilan Pasien & Loket',
-        bg: 'linear-gradient(135deg, #0d9488, #0284c7)',
-        quickUsers: [
-          { label: 'Petugas Poliklinik', user: 'poliklinik', pass: 'poli123' },
-          { label: 'Petugas Farmasi', user: 'farmasi', pass: 'farmasi123' },
-          { label: 'Admin', user: 'admin', pass: 'admin123' }
-        ]
+        bg: 'linear-gradient(135deg, #059669, #15803d)'
       };
     }
     return {
       icon: <ShieldCheck size={28} />,
       title: 'Login Administrator Sistem',
       subtitle: 'Akses penuh untuk mengubah dan mengelola seluruh sistem',
-      bg: 'linear-gradient(135deg, #4f46e5, #0284c7)',
-      quickUsers: [
-        { label: 'Super Admin', user: 'admin', pass: 'admin123' }
-      ]
+      bg: 'linear-gradient(135deg, #166534, #047857)'
     };
   };
 
@@ -136,7 +124,7 @@ export default function LoginForm({ targetRole, hospital, onLoginSuccess }) {
             {roleInfo.icon}
           </div>
         )}
-        <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
           {hospital?.name || 'Sistem Antrean RS'}
         </div>
         <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.4rem', fontWeight: '800', color: '#0f172a' }}>
@@ -232,41 +220,6 @@ export default function LoginForm({ targetRole, hospital, onLoginSuccess }) {
           {loading ? 'Memverifikasi...' : 'Masuk (Login)'}
         </button>
       </form>
-
-      {/* Quick Fill Credentials Helper */}
-      <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid #f1f5f9' }}>
-        <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
-          💡 Akun Default Terdaftar:
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {roleInfo.quickUsers.map((qu, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => {
-                setUsername(qu.user);
-                setPassword(qu.pass);
-              }}
-              style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                fontSize: '0.78rem',
-                color: '#334155',
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <span><strong>{qu.label}</strong> (user: <code>{qu.user}</code>)</span>
-              <span style={{ color: '#0284c7', fontWeight: '700' }}>Gunakan ➔</span>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

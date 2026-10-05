@@ -160,7 +160,7 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
     <div className="officer-container">
       {/* Sidebar Setup */}
       <div className="officer-sidebar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0284c7', fontWeight: '800' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#15803d', fontWeight: '800' }}>
           <UserCheck size={20} />
           <span>KONSOL PETUGAS</span>
         </div>
@@ -186,13 +186,13 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
           />
         </div>
 
-        <div style={{ background: '#f0f9ff', padding: '1rem', borderRadius: '12px', border: '1px solid #bae6fd' }}>
+        <div style={{ background: '#ecfdf5', padding: '1rem', borderRadius: '12px', border: '1px solid #a7f3d0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: '700', textTransform: 'uppercase' }}>STATUS POLIKLINIK SAAT INI</span>
+            <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '700', textTransform: 'uppercase' }}>STATUS POLIKLINIK SAAT INI</span>
             <span style={{ fontSize: '0.7rem', color: '#047857', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>Tersimpan Otomatis</span>
           </div>
           <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', margin: '4px 0' }}>{activeClinic?.name} [{activeClinic?.prefix}]</div>
-          <div style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: '700' }}>
+          <div style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: '700' }}>
             {activeCounter?.name ? `${activeCounter.name} • ` : ''}Kuota: {activeClinic?.quota || 50} Pasien
           </div>
         </div>
@@ -248,7 +248,7 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
               <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '1.5rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>PENJAMIN</span>
                 <div>
-                  <span style={{ fontSize: '0.8rem', fontWeight: '900', background: servingTicket.patientType === 'BPJS' ? '#e0f2fe' : '#ccfbf1', color: servingTicket.patientType === 'BPJS' ? '#0369a1' : '#0d9488', padding: '3px 10px', borderRadius: '10px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: '900', background: servingTicket.patientType === 'BPJS' ? '#ecfdf5' : '#fef3c7', color: servingTicket.patientType === 'BPJS' ? '#166534' : '#b45309', padding: '3px 10px', borderRadius: '10px' }}>
                     {servingTicket.patientType || 'BPJS'}
                   </span>
                 </div>
@@ -319,8 +319,8 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
                 </tr>
               ) : (
                 todayTickets.map((t) => (
-                  <tr key={t.id} style={{ background: t.id === servingTicket?.id ? '#f0f9ff' : 'transparent' }}>
-                    <td style={{ fontWeight: '800', fontFamily: 'var(--font-heading)', fontSize: '1.1rem', color: t.status === 'CALLED' ? '#0284c7' : '#0f172a' }}>
+                  <tr key={t.id} style={{ background: t.id === servingTicket?.id ? '#ecfdf5' : 'transparent' }}>
+                    <td style={{ fontWeight: '800', fontFamily: 'var(--font-heading)', fontSize: '1.1rem', color: t.status === 'CALLED' ? '#15803d' : '#0f172a' }}>
                       {t.ticketNumber}
                     </td>
                     <td style={{ fontWeight: '700', color: '#0f172a' }}>
@@ -330,7 +330,7 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
                       {t.nik !== '-' ? t.nik : (t.norm !== '-' ? t.norm : '-')}
                     </td>
                     <td>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '800', background: t.patientType === 'BPJS' ? '#e0f2fe' : '#ccfbf1', color: t.patientType === 'BPJS' ? '#0369a1' : '#0d9488', padding: '2px 8px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '800', background: t.patientType === 'BPJS' ? '#ecfdf5' : '#fef3c7', color: t.patientType === 'BPJS' ? '#166534' : '#b45309', padding: '2px 8px', borderRadius: '8px' }}>
                         {t.patientType || 'BPJS'}
                       </span>
                     </td>
@@ -338,8 +338,8 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
                     <td>
                       <span style={{
                         padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '700',
-                        background: t.status === 'WAITING' ? '#fef3c7' : t.status === 'CALLED' ? '#e0f2fe' : t.status === 'COMPLETED' ? '#d1fae5' : '#fee2e2',
-                        color: t.status === 'WAITING' ? '#d97706' : t.status === 'CALLED' ? '#0369a1' : t.status === 'COMPLETED' ? '#047857' : '#b91c1c'
+                        background: t.status === 'WAITING' ? '#fef3c7' : t.status === 'CALLED' ? '#ecfdf5' : t.status === 'COMPLETED' ? '#d1fae5' : '#fee2e2',
+                        color: t.status === 'WAITING' ? '#d97706' : t.status === 'CALLED' ? '#15803d' : t.status === 'COMPLETED' ? '#047857' : '#b91c1c'
                       }}>
                         {t.status}
                       </span>
@@ -348,7 +348,7 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
                     <td>
                       {t.status === 'SKIPPED' && (
                         <button
-                          style={{ padding: '4px 10px', background: '#0284c7', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700' }}
+                          style={{ padding: '4px 10px', background: '#15803d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700' }}
                           onClick={() => onCallTicket({ ticketId: t.id, counterId: activeCounter.id, counterName: activeCounter.name, officerName }, () => showNotice(`Memanggil kembali antrean ${t.ticketNumber}`))}
                         >
                           Panggil Kembali

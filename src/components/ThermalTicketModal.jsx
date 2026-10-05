@@ -135,7 +135,7 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
         {/* Status Banner */}
         <div className="no-print" style={{
-          background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+          background: 'linear-gradient(135deg, #15803d, #166534)',
           color: 'white',
           padding: '10px 22px',
           borderRadius: '30px',
@@ -144,7 +144,7 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          boxShadow: '0 4px 15px rgba(2, 132, 199, 0.35)'
+          boxShadow: '0 4px 15px rgba(21, 128, 61, 0.35)'
         }}>
           <span style={{ fontSize: '1.2rem' }}>🖨️</span>
           <span>Mengirim tiket ke printer thermal...</span>

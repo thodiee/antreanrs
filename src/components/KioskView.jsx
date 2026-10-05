@@ -237,7 +237,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: '#ecfdf5', color: '#15803d', border: '1px solid #a7f3d0', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700' }}>
             <Ticket size={16} /> ANTREAN MANDIRI (KIOSK)
           </div>
           {bridgeStatus?.connected && (
@@ -306,8 +306,8 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
                     }
                   }}
                   style={{
-                    background: isDisabled ? undefined : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                    boxShadow: isDisabled ? undefined : '0 6px 18px rgba(2, 132, 199, 0.35)',
+                    background: isDisabled ? undefined : 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
+                    boxShadow: isDisabled ? undefined : '0 6px 18px rgba(21, 128, 61, 0.35)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -369,7 +369,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
           }}>
             <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#0284c7', background: '#e0f2fe', padding: '3px 10px', borderRadius: '10px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#15803d', background: '#ecfdf5', padding: '3px 10px', borderRadius: '10px' }}>
                   POLIKLINIK [{activeClinicModal.prefix}]
                 </span>
                 <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#0f172a', marginTop: '4px' }}>
@@ -443,9 +443,9 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
                     style={{
                       padding: '0.75rem',
                       borderRadius: '10px',
-                      border: patientForm.patientType === 'BPJS' ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                      background: patientForm.patientType === 'BPJS' ? '#e0f2fe' : '#f8fafc',
-                      color: patientForm.patientType === 'BPJS' ? '#0284c7' : '#475569',
+                      border: patientForm.patientType === 'BPJS' ? '2px solid #15803d' : '1px solid #cbd5e1',
+                      background: patientForm.patientType === 'BPJS' ? '#ecfdf5' : '#f8fafc',
+                      color: patientForm.patientType === 'BPJS' ? '#15803d' : '#475569',
                       fontWeight: '800',
                       cursor: 'pointer'
                     }}

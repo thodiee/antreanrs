@@ -206,6 +206,28 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     return () => clearInterval(timer);
   }, []);
 
+  // Handshake helper to command YouTube iframe
+  const sendYouTubeCommand = (func, args = []) => {
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+      }
+    } catch (e) {}
+  };
+
+  const initYouTubePlayer = () => {
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
+        if (audioUnlocked) {
+          sendYouTubeCommand('unMute');
+          sendYouTubeCommand('setVolume', [100]);
+        }
+        sendYouTubeCommand('playVideo');
+      }
+    } catch (e) {}
+  };
+
   // Listen to YouTube Iframe postMessage events (onStateChange=0 ENDED triggers immediate video rotation)
   useEffect(() => {
     const handleWindowMessage = (event) => {
@@ -216,9 +238,12 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
         }
         if (!data) return;
 
-        const state = data.info?.playerState !== undefined ? data.info.playerState : data.info;
-        if (state === 0 || (data.event === 'onStateChange' && data.info === 0)) {
-          console.log('[TvDisplay] YouTube video completed (state 0), advancing to next video!');
+        const info = data.info;
+        const playerState = info?.playerState !== undefined ? info.playerState : (typeof info === 'number' ? info : undefined);
+        const isEnded = playerState === 0 || (data.event === 'onStateChange' && (data.info === 0 || data.info?.playerState === 0));
+
+        if (isEnded) {
+          console.log('[TvDisplay] YouTube video selesai (state 0), berganti ke video berikutnya...');
           if (videoList.length > 1) {
             setCurrentVideoIndex((prev) => (prev + 1) % videoList.length);
           }
@@ -230,50 +255,68 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     return () => window.removeEventListener('message', handleWindowMessage);
   }, [videoList.length]);
 
-  // Handshake and auto un-mute YouTube iframe when index changes
+  // Handshake and auto un-mute YouTube iframe when index changes (multi-stage timeouts to ensure iframe is ready)
   useEffect(() => {
     if (parsedVideo.type === 'youtube') {
-      const t = setTimeout(() => {
-        try {
-          if (iframeRef.current && iframeRef.current.contentWindow) {
-            iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
-            if (audioUnlocked) {
-              iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-              iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }), '*');
-            }
-            iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-          }
-        } catch (e) {}
-      }, 700);
-      return () => clearTimeout(t);
+      initYouTubePlayer();
+      const t1 = setTimeout(initYouTubePlayer, 600);
+      const t2 = setTimeout(initYouTubePlayer, 1500);
+      const t3 = setTimeout(initYouTubePlayer, 3000);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     }
   }, [currentVideoIndex, audioUnlocked, parsedVideo.type]);
 
-  // Auto rotate playlist if multiple videos exist
+  // Auto rotate playlist if multiple videos exist based on configured duration
   useEffect(() => {
     if (videoList.length <= 1) return;
 
-    let switchMs = 30000; // default 30s
-    const customSec = currentVid?.duration ? parseInt(currentVid.duration) : null;
+    const rawDuration = (currentVid?.duration !== undefined && currentVid?.duration !== null)
+      ? parseInt(currentVid.duration)
+      : 0;
 
-    if (customSec && !isNaN(customSec) && customSec > 5) {
-      switchMs = customSec * 1000;
-    } else if (parsedVideo.type === 'direct') {
-      // Direct video advances on onEnded, but safety watchdog at 60s
-      switchMs = 60000;
-    } else if (parsedVideo.type === 'tiktok' || parsedVideo.type === 'instagram') {
-      switchMs = 30000; // 30s for TikTok and Instagram Reels
-    } else if (parsedVideo.type === 'youtube') {
-      switchMs = 75000; // 75s safety fallback for YouTube (switches immediately upon end event)
-    } else if (parsedVideo.type === 'gdrive') {
-      switchMs = 60000; // 60s for Google Drive
+    // rawDuration === 0: "Putar Sampai Selesai (Otomatis)"
+    if (!rawDuration || rawDuration <= 0) {
+      if (parsedVideo.type === 'direct') {
+        // File video langsung (.mp4/.webm) akan memanggil handleVideoEnded via event onEnded.
+        // Failsafe watchdog 60 menit jika video macet
+        const watchdog = setTimeout(() => {
+          console.log('[TvDisplay] Watchdog tercapai untuk video langsung (60m), berganti...');
+          setCurrentVideoIndex((prev) => (prev + 1) % videoList.length);
+        }, 60 * 60 * 1000);
+        return () => clearTimeout(watchdog);
+      } else if (parsedVideo.type === 'youtube') {
+        // YouTube akan memicu pergantian saat state 0 (ENDED).
+        // Failsafe watchdog 60 menit agar video panjang (seminar/profil RS) tidak terpotong
+        const watchdog = setTimeout(() => {
+          console.log('[TvDisplay] Watchdog tercapai untuk YouTube (60m), berganti...');
+          setCurrentVideoIndex((prev) => (prev + 1) % videoList.length);
+        }, 60 * 60 * 1000);
+        return () => clearTimeout(watchdog);
+      } else if (parsedVideo.type === 'gdrive') {
+        // Google Drive preview iframe tidak mengirim event tamat ke window induk.
+        // Default 180 detik (3 menit) jika dipilih otomatis
+        const timer = setTimeout(() => {
+          console.log('[TvDisplay] Google Drive mencapai durasi bawaan 180s, berganti...');
+          setCurrentVideoIndex((prev) => (prev + 1) % videoList.length);
+        }, 180 * 1000);
+        return () => clearTimeout(timer);
+      } else {
+        // TikTok / Instagram
+        const timer = setTimeout(() => {
+          console.log('[TvDisplay] Video sosial media mencapai durasi 60s, berganti...');
+          setCurrentVideoIndex((prev) => (prev + 1) % videoList.length);
+        }, 60 * 1000);
+        return () => clearTimeout(timer);
+      }
     } else {
-      switchMs = 60000;
-    }
-
-    if (switchMs > 0) {
+      // Durasi kustom yang ditentukan secara spesifik (misal 30 dtk, 60 dtk, 180 dtk, 300 dtk, dst)
+      const switchMs = Math.max(rawDuration, 5) * 1000;
       const timer = setTimeout(() => {
-        console.log(`[TvDisplay] Timer reached ${switchMs}ms, advancing to next video...`);
+        console.log(`[TvDisplay] Timer durasi ${switchMs}ms (${rawDuration}s) tercapai, berganti ke video berikutnya...`);
         setCurrentVideoIndex((prev) => (prev + 1) % videoList.length);
       }, switchMs);
       return () => clearTimeout(timer);
@@ -400,22 +443,22 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
             top: '16px',
             right: '24px',
             zIndex: 99999,
-            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
             color: 'white',
             padding: '10px 22px',
             borderRadius: '50px',
-            boxShadow: '0 8px 30px rgba(2, 132, 199, 0.45)',
+            boxShadow: '0 8px 30px rgba(234, 179, 8, 0.35)',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
             cursor: 'pointer',
             fontSize: '0.88rem',
             fontWeight: '800',
-            border: '2px solid rgba(255,255,255,0.4)',
+            border: '2px solid #fde047',
             animation: 'pulse 2s infinite'
           }}
         >
-          <Volume2 size={20} />
+          <Volume2 size={20} color="#fef08a" />
           <span>🔊 Klik untuk Aktifkan Suara TV (Video & Antrean)</span>
         </div>
       )}
@@ -473,8 +516,8 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
               </div>
             </div>
           ) : (
-            <div className="current-call-card" style={{ background: '#ffffff', border: '2px solid #bae6fd', boxShadow: '0 10px 30px rgba(2, 132, 199, 0.08)', animation: 'none' }}>
-              <div className="current-call-label" style={{ color: '#0284c7' }}>STATUS ANTREAN SEKARANG</div>
+            <div className="current-call-card" style={{ background: '#ffffff', border: '2px solid #bbf7d0', boxShadow: '0 10px 30px rgba(21, 128, 61, 0.08)', animation: 'none' }}>
+              <div className="current-call-label" style={{ color: '#15803d' }}>STATUS ANTREAN SEKARANG</div>
               <div className="current-call-number" style={{ color: '#0f172a', fontSize: '6.5rem' }}>---</div>
               <div className="current-call-destination" style={{ color: '#475569', fontSize: '1.5rem' }}>Silakan mengambil tiket antrean di Kiosk & tunggu dipanggil</div>
             </div>
@@ -487,7 +530,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                 KATALOG POLIKLINIK ({clinics.length} POLI)
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#0284c7', background: '#e0f2fe', padding: '3px 10px', borderRadius: '10px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#15803d', background: '#ecfdf5', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: '10px' }}>
                   Halaman {currentClinicPage + 1} dari {totalClinicPages}
                 </span>
                 <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>
@@ -516,10 +559,10 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
               return (
                 <div key={clinic.id} className="tv-clinic-box" style={{
                   background: '#ffffff',
-                  border: isCallActive ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                  border: isCallActive ? '2.5px solid #15803d' : '1px solid #cbd5e1',
                   borderRadius: '16px',
                   padding: '1.1rem 1.25rem',
-                  boxShadow: isCallActive ? '0 4px 18px rgba(2, 132, 199, 0.15)' : '0 4px 12px rgba(0,0,0,0.04)',
+                  boxShadow: isCallActive ? '0 4px 18px rgba(234, 179, 8, 0.35)' : '0 4px 12px rgba(0,0,0,0.04)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px'
@@ -527,7 +570,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                   {/* Top Title Bar */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: '900', color: '#0284c7', background: '#e0f2fe', padding: '3px 9px', borderRadius: '10px' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: '900', color: '#15803d', background: '#ecfdf5', border: '1px solid #bbf7d0', padding: '3px 9px', borderRadius: '10px' }}>
                         [{clinic.prefix}]
                       </span>
                       <span style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a' }}>
@@ -540,8 +583,9 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                       fontWeight: '800',
                       padding: '4px 12px',
                       borderRadius: '12px',
-                      background: waitingCount > 0 ? '#fef3c7' : isCallActive ? '#e0f2fe' : '#f1f5f9',
-                      color: waitingCount > 0 ? '#b45309' : isCallActive ? '#0284c7' : '#64748b'
+                      background: waitingCount > 0 ? '#fef3c7' : isCallActive ? '#ecfdf5' : '#f1f5f9',
+                      color: waitingCount > 0 ? '#b45309' : isCallActive ? '#15803d' : '#64748b',
+                      border: isCallActive ? '1px solid #bbf7d0' : 'none'
                     }}>
                       {waitingCount > 0 ? `${waitingCount} Menunggu` : lastCalledTicket ? 'Antrean Selesai' : 'Belum Ada Antrean'}
                     </span>
@@ -550,15 +594,15 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                   {/* Grid of Dipanggil vs Terakhir Ambil */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'center' }}>
                     {/* Left: Dipanggil */}
-                    <div style={{ background: isCallActive ? '#f0f9ff' : '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ background: isCallActive ? '#f0fdf4' : '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: isCallActive ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.7rem', color: isCallActive ? '#15803d' : '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         DIPANGGIL:
                       </div>
-                      <div style={{ fontSize: '1.75rem', fontWeight: '900', color: isCallActive ? '#0284c7' : lastCalledTicket ? '#334155' : '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
+                      <div style={{ fontSize: '1.75rem', fontWeight: '900', color: isCallActive ? '#15803d' : lastCalledTicket ? '#334155' : '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
                         {lastCalledTicket ? lastCalledTicket.ticketNumber : '-'}
                       </div>
                       {lastCalledTicket && (
-                        <div style={{ fontSize: '0.65rem', fontWeight: '700', color: isCallActive ? '#0284c7' : '#64748b', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: '700', color: isCallActive ? '#15803d' : '#64748b', marginTop: '2px' }}>
                           {isCallActive ? '● Dipanggil/Melayani' : '● Selesai'}
                         </div>
                       )}
@@ -569,11 +613,11 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                       <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         TERAKHIR AMBIL:
                       </div>
-                      <div style={{ fontSize: '1.75rem', fontWeight: '900', color: lastTakenTicket ? '#0d9488' : '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
+                      <div style={{ fontSize: '1.75rem', fontWeight: '900', color: lastTakenTicket ? '#d97706' : '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
                         {lastTakenTicket ? lastTakenTicket.ticketNumber : '-'}
                       </div>
                       {lastTakenTicket && (
-                        <div style={{ fontSize: '0.65rem', fontWeight: '700', color: '#0d9488', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', marginTop: '2px' }}>
                           Total: {clinicTickets.length} Tiket
                         </div>
                       )}
@@ -613,6 +657,11 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                   scrolling="no"
+                  onLoad={() => {
+                    if (parsedVideo.type === 'youtube') {
+                      initYouTubePlayer();
+                    }
+                  }}
                   style={{
                     width: '100%',
                     height: '100%',
@@ -686,8 +735,8 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
             <div className="audio-ducking-indicator" style={{ background: 'rgba(255, 255, 255, 0.95)', color: '#0f172a', boxShadow: '0 2px 10px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1' }}>
               {isVideoDucked ? (
                 <>
-                  <Volume2 size={16} style={{ color: '#0284c7', animation: 'bounce 1s infinite' }} />
-                  <span style={{ fontWeight: '800', color: '#0284c7' }}>Suara Panggilan Aktif</span>
+                  <Volume2 size={16} style={{ color: '#15803d', animation: 'bounce 1s infinite' }} />
+                  <span style={{ fontWeight: '800', color: '#15803d' }}>Suara Panggilan Aktif</span>
                 </>
               ) : (
                 <>
@@ -754,7 +803,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                     onClick={handleToggleAudio}
                     title={audioUnlocked ? 'Bisu Suara' : 'Aktifkan Suara'}
                     style={{
-                      background: audioUnlocked ? '#0284c7' : '#475569',
+                      background: audioUnlocked ? '#15803d' : '#475569',
                       border: 'none',
                       color: 'white',
                       cursor: 'pointer',
@@ -778,7 +827,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                       setCurrentVideoIndex((prev) => (prev + 1) % videoList.length);
                     }}
                     title="Video Selanjutnya"
-                    style={{ background: '#0284c7', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '8px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '800' }}
+                    style={{ background: '#15803d', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '8px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '800' }}
                   >
                     <span>Next</span> <SkipForward size={15} />
                   </button>
@@ -789,8 +838,8 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
         </div>
       </div>
 
-      {/* Marquee Running Text (Light Bright Gradient) */}
-      <div className="tv-marquee" style={{ background: 'linear-gradient(90deg, #0284c7, #0d9488)', color: 'white', fontWeight: '700' }}>
+      {/* Marquee Running Text (Emerald Green with Gold Border) */}
+      <div className="tv-marquee" style={{ background: 'linear-gradient(90deg, #14532d 0%, #15803d 50%, #166534 100%)', borderTop: '2.5px solid #eab308', color: '#fef9c3', fontWeight: '700' }}>
         <div className="marquee-text">
           {hospital?.runningText || `Selamat datang di ${hospital?.name || 'Rumah Sakit'}. Harap siapkan kartu identitas/BPJS Anda.`}
         </div>
