@@ -78,9 +78,19 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     assignedClinicIds: []
   });
 
+  const getAuthHeaders = (additional = {}) => {
+    try {
+      const saved = localStorage.getItem('antrean_user');
+      const token = saved ? JSON.parse(saved)?.token : null;
+      return token ? { ...additional, 'Authorization': `Bearer ${token}` } : additional;
+    } catch {
+      return additional;
+    }
+  };
+
   const fetchUsers = () => {
     setLoadingUsers(true);
-    fetch('/api/users')
+    fetch('/api/users', { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         setLoadingUsers(false);
@@ -170,7 +180,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         // Edit existing
         const res = await fetch(`/api/users/${editingUser.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             name: userForm.name,
             role: userForm.role,
@@ -195,7 +205,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         }
         const res = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             username: userForm.username,
             password: userForm.password,
@@ -223,7 +233,10 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     if (!window.confirm(`Yakin ingin menghapus pengguna "${user.name}" (${user.username})?`)) return;
 
     try {
-      const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/users/${user.id}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (data.success) {
         showToast('Pengguna berhasil dihapus.');
@@ -368,6 +381,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
         const res = await fetch('/api/upload-video', {
           method: 'POST',
+          headers: getAuthHeaders(),
           body: formData
         });
 

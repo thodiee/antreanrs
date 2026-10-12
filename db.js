@@ -19,13 +19,16 @@ export async function initDatabase() {
     await connection.end();
 
     const pool = mysql.createPool({
-      ...dbConfig,
+      host: dbConfig.host,
+      user: dbConfig.user,
+      password: dbConfig.password,
       database: DB_NAME,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
       dateStrings: true,
-      timezone: '+07:00'
+      timezone: '+07:00',
+      multipleStatements: false
     });
 
     const schemaSql = `
@@ -111,7 +114,14 @@ export async function initDatabase() {
       );
     `;
 
-    await pool.query(schemaSql);
+    const statements = schemaSql
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    for (const stmt of statements) {
+      await pool.query(stmt);
+    }
 
     // Auto-migrate missing columns if table already existed
     try {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { socket } from './services/socket';
+import { socket, updateSocketAuth } from './services/socket';
 
 import KioskView from './components/KioskView';
 import TvDisplayView from './components/TvDisplayView';
@@ -82,6 +82,16 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [lastCall, setLastCall] = useState(null);
 
+  const getAuthHeaders = (additional = {}) => {
+    try {
+      const saved = localStorage.getItem('antrean_user');
+      const token = saved ? JSON.parse(saved)?.token : null;
+      return token ? { ...additional, 'Authorization': `Bearer ${token}` } : additional;
+    } catch {
+      return additional;
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
@@ -151,7 +161,7 @@ export default function App() {
     function onDayChanged({ date }) {
       console.log('[AntreanRS] Day changed detected:', date);
       setLastCall(null);
-      fetch('/api/initial-state')
+      fetch('/api/initial-state', { headers: getAuthHeaders() })
         .then(res => res.json())
         .then(resData => setData(resData))
         .catch(err => console.warn('Fetch state on day change warning:', err));
@@ -187,7 +197,7 @@ export default function App() {
     socket.on('day_changed', onDayChanged);
     socket.on('video_ready', onVideoReady);
 
-    fetch('/api/initial-state')
+    fetch('/api/initial-state', { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(resData => setData(resData))
       .catch(err => console.warn('Fetch initial state warning:', err));
@@ -200,7 +210,7 @@ export default function App() {
         lastDate = currentDate;
         console.log('[AntreanRS] Client detected midnight day change, refreshing queue state...');
         setLastCall(null);
-        fetch('/api/initial-state')
+        fetch('/api/initial-state', { headers: getAuthHeaders() })
           .then(res => res.json())
           .then(resData => setData(resData))
           .catch(() => {});
@@ -247,11 +257,15 @@ export default function App() {
   const handleLoginSuccess = (userObj) => {
     setCurrentUser(userObj);
     localStorage.setItem('antrean_user', JSON.stringify(userObj));
+    if (userObj?.token) {
+      updateSocketAuth(userObj.token);
+    }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('antrean_user');
+    updateSocketAuth(null);
   };
 
   const handleTakeTicket = (payload, callback) => {
@@ -278,7 +292,7 @@ export default function App() {
   const handleUpdateSettings = (payload, callback) => {
     fetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload)
     })
       .then(res => res.json())
@@ -294,7 +308,7 @@ export default function App() {
   const handleResetShift = (callback) => {
     fetch('/api/reset-shift', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' })
     })
       .then(res => res.json())
       .then(resData => {
