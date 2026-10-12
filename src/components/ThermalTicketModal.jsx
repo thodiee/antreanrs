@@ -146,7 +146,7 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
           gap: '10px',
           boxShadow: '0 4px 15px rgba(21, 128, 61, 0.35)'
         }}>
-          <span style={{ fontSize: '1.2rem' }}>🖨️</span>
+          <Printer size={20} />
           <span>Mengirim tiket ke printer thermal...</span>
         </div>
 

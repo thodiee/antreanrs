@@ -42,7 +42,9 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS videos (
         id VARCHAR(50) PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
-        url LONGTEXT NOT NULL
+        url LONGTEXT NOT NULL,
+        duration INT DEFAULT 0,
+        sort_order INT DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS info_slides (
@@ -149,9 +151,12 @@ export async function initDatabase() {
       await pool.query('ALTER TABLE hospitals ADD COLUMN display_settings TEXT');
     } catch {}
 
-    // Auto-migrate videos duration column
+    // Auto-migrate videos duration & sort_order column
     try {
-      await pool.query('ALTER TABLE videos ADD COLUMN duration INT DEFAULT 30');
+      await pool.query('ALTER TABLE videos ADD COLUMN duration INT DEFAULT 0');
+    } catch {}
+    try {
+      await pool.query('ALTER TABLE videos ADD COLUMN sort_order INT DEFAULT 0');
     } catch {}
 
     // Migration for Patient details in tickets table

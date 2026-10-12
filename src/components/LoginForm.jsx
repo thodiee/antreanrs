@@ -81,7 +81,7 @@ export default function LoginForm({ targetRole, hospital, onLoginSuccess }) {
   const roleInfo = getRoleBadge();
 
   return (
-    <div style={{
+    <div className="login-card-container" style={{
       maxWidth: '440px',
       margin: '3.5rem auto',
       background: 'white',

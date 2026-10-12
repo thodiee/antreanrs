@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
 import { initDatabase } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +34,64 @@ if (!fs.existsSync(mediaDir)) {
   fs.mkdirSync(mediaDir, { recursive: true });
 }
 app.use('/videos', express.static(mediaDir));
+
+// Multer storage for local video uploads
+const videoStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, mediaDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.mp4';
+    const cleanBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+    const id = `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    cb(null, `${id}_${cleanBase}${ext}`);
+  }
+});
+
+const uploadVideoMiddleware = multer({
+  storage: videoStorage
+  // Tanpa batasan ukuran file video (unlimited)
+});
+
+// Dedicated endpoint for uploading local video files (.mp4, .webm, etc.)
+app.post('/api/upload-video', uploadVideoMiddleware.single('video'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'File video tidak ditemukan.' });
+    }
+    const relativeUrl = `/videos/${req.file.filename}`;
+    const rawTitle = req.body?.title || path.basename(req.file.originalname, path.extname(req.file.originalname));
+    const videoId = `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+    let nextOrder = 1;
+    try {
+      const [orderRows] = await pool.query('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM videos');
+      nextOrder = (orderRows[0]?.max_order ?? 0) + 1;
+      await pool.query(
+        'INSERT INTO videos (id, title, url, duration, sort_order) VALUES (?, ?, ?, ?, ?)',
+        [videoId, rawTitle, relativeUrl, 0, nextOrder]
+      );
+      console.log(`[Video-Upload] Video saved to database: ${videoId} (${rawTitle}) with sort_order=${nextOrder}`);
+      
+      // Broadcast state update immediately
+      const updatedState = await getFullState();
+      io.emit('state_update', updatedState);
+    } catch (dbErr) {
+      console.error('Error inserting uploaded video into DB:', dbErr);
+    }
+
+    const videoObj = {
+      id: videoId,
+      title: rawTitle,
+      url: relativeUrl,
+      duration: 0,
+      sortOrder: nextOrder
+    };
+    console.log(`[Video-Upload] File video uploaded successfully: ${req.file.filename} (${(req.file.size / 1024 / 1024).toFixed(2)} MB)`);
+    res.json({ success: true, video: videoObj });
+  } catch (err) {
+    console.error('Error uploading video file:', err);
+    res.status(500).json({ success: false, error: 'Gagal mengunggah file video.' });
+  }
+});
 
 const activeVideoDownloads = new Set();
 
@@ -144,7 +203,7 @@ async function resolveVideoRedirect(url) {
 // Helper to load full current database state
 async function getFullState() {
   const [hospitals] = await pool.query('SELECT name, tagline, running_text AS runningText, logo, print_settings AS printSettings, display_settings AS displaySettings FROM hospitals LIMIT 1');
-  const [videos] = await pool.query('SELECT id, title, url, COALESCE(duration, 0) AS duration FROM videos');
+  const [videos] = await pool.query('SELECT id, title, url, COALESCE(duration, 0) AS duration, COALESCE(sort_order, 0) AS sortOrder FROM videos ORDER BY sort_order ASC, id ASC');
   
   // Auto-resolve any short TikTok links in database
   for (const v of videos) {
@@ -618,13 +677,38 @@ async function processSaveSettings(payload) {
 
   if (payload.videos && Array.isArray(payload.videos)) {
     await pool.query('DELETE FROM videos');
-    for (const v of payload.videos) {
+    for (let i = 0; i < payload.videos.length; i++) {
+      const v = payload.videos[i];
       if (v.title && v.url) {
-        const saveUrl = await resolveVideoRedirect(v.url);
+        let saveUrl = v.url;
+
+        // Auto-save base64 video to file if any were sent directly
+        if (typeof saveUrl === 'string' && saveUrl.startsWith('data:video/')) {
+          try {
+            const matches = saveUrl.match(/^data:video\/([a-zA-Z0-9]+);base64,(.+)$/);
+            if (matches) {
+              const ext = matches[1] === 'webm' ? '.webm' : '.mp4';
+              const fileId = v.id || `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+              const filename = `${fileId}${ext}`;
+              const filePath = path.join(mediaDir, filename);
+              const buffer = Buffer.from(matches[2], 'base64');
+              fs.writeFileSync(filePath, buffer);
+              saveUrl = `/videos/${filename}`;
+              console.log(`[Video-Save] Base64 video written to disk: ${filename} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
+            }
+          } catch (e) {
+            console.warn('[Video-Save] Failed to save base64 video to disk:', e);
+          }
+        } else {
+          saveUrl = await resolveVideoRedirect(saveUrl);
+        }
+
         const durationVal = (v.duration !== undefined && v.duration !== null && !isNaN(parseInt(v.duration))) ? parseInt(v.duration) : 0;
+        const sortOrder = i + 1;
+
         await pool.query(
-          `INSERT INTO videos (id, title, url, duration) VALUES (?, ?, ?, ?)`,
-          [v.id || `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, v.title, saveUrl, durationVal]
+          `INSERT INTO videos (id, title, url, duration, sort_order) VALUES (?, ?, ?, ?, ?)`,
+          [v.id || `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, v.title, saveUrl, durationVal, sortOrder]
         );
       }
     }

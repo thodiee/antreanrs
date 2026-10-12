@@ -38,10 +38,10 @@
   --tv-gold: #d97706;
   --tv-glow: rgba(21, 128, 61, 0.2);
 
-  --radius-sm: 5%;
-  --radius-md: 5%;
-  --radius-lg: 5%;
-  --radius-xl: 5%;
+  --radius-sm: 5px;
+  --radius-md: 5px;
+  --radius-lg: 5px;
+  --radius-xl: 5px;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(21, 128, 61, 0.08);
@@ -50,7 +50,7 @@
   --shadow-gold: 0 0 20px rgba(234, 179, 8, 0.35);
 }
 
-/* Border radius 5% pada tiap elemen UI antarmuka */
+/* Border radius 5px pada tiap elemen UI antarmuka */
 .brand-logo,
 .view-btn,
 .status-badge,
@@ -67,17 +67,18 @@
 .btn-primary,
 .btn-secondary,
 .btn-danger,
+.tv-marquee,
 button,
 input,
 select,
-textarea,
-[style*="border-radius"] {
-  border-radius: 5% !important;
+textarea {
+  border-radius: 5px !important;
 }
 
 /* Pertahankan elemen lingkaran bulat sempurna */
 .status-dot,
-[style*="50%"] {
+[style*="border-radius: 50%"],
+[style*="border-radius:50%"] {
   border-radius: 50% !important;
 }
 
@@ -109,6 +110,57 @@ body {
   top: 0;
   z-index: 1000;
   box-shadow: 0 2px 10px rgba(21, 128, 61, 0.08);
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+.top-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-open-tab {
+  font-size: 0.75rem;
+  padding: 6px 12px;
+  border-radius: 15px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.user-nav-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ecfdf5;
+  border: 1.5px solid #fde047;
+  padding: 4px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(234, 179, 8, 0.15);
+  white-space: nowrap;
+}
+
+.user-nav-name {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #14532d;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand {
@@ -179,6 +231,14 @@ body {
   font-weight: 800;
 }
 
+.nav-label-pc {
+  display: inline;
+}
+
+.nav-label-mobile {
+  display: none;
+}
+
 .status-badge {
   display: flex;
   align-items: center;
@@ -242,6 +302,62 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.5rem;
+}
+
+/* PC Desktop Mode: 5 Cards Per Row for Kiosk Pasien */
+@media (min-width: 1024px) {
+  .kiosk-container {
+    max-width: 1650px !important;
+    width: 96% !important;
+    padding: 1.5rem 1rem !important;
+  }
+
+  .kiosk-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 1rem !important;
+  }
+
+  .clinic-card {
+    padding: 1.15rem 0.95rem !important;
+    gap: 0.85rem !important;
+  }
+
+  .clinic-badge {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 1.35rem !important;
+  }
+
+  .quota-pill {
+    font-size: 0.72rem !important;
+    padding: 3px 8px !important;
+  }
+
+  .clinic-info h3 {
+    font-size: 1.15rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .clinic-info p {
+    font-size: 0.8rem !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  .clinic-meta {
+    font-size: 0.75rem !important;
+    gap: 4px !important;
+  }
+
+  .take-ticket-btn {
+    padding: 10px 10px !important;
+    font-size: 0.88rem !important;
+    gap: 6px !important;
+  }
 }
 
 .clinic-card {
@@ -470,6 +586,7 @@ body {
 .tv-queue-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
   gap: 0.85rem;
   flex: 1;
 }
@@ -536,6 +653,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   position: relative;
+  border-radius: 5px;
 }
 
 .marquee-text {
@@ -552,11 +670,14 @@ body {
 /* OFFICER CONSOLE VIEW */
 .officer-container {
   max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
   padding: 1.5rem;
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 1.5rem;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .officer-sidebar {
@@ -568,6 +689,8 @@ body {
   flex-direction: column;
   gap: 1.25rem;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .counter-selector select, .counter-selector input {
@@ -578,12 +701,16 @@ body {
   font-size: 0.95rem;
   margin-top: 0.35rem;
   background: white;
+  box-sizing: border-box;
 }
 
 .officer-main {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .console-hero {
@@ -597,6 +724,9 @@ body {
   align-items: center;
   text-align: center;
   gap: 1.5rem;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .active-ticket-display {
@@ -925,4 +1055,483 @@ body {
   border: none;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* ==========================================================================
+   MOBILE & RESPONSIVE DEVICE OPTIMIZATIONS (HP / Smartphone / Small Screens)
+   ========================================================================== */
+
+/* Pastikan tidak ada horizontal overflow pada viewport mobile */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+img, video, iframe {
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  /* --- 1. Top Navigation Bar (Header) --- */
+  .top-nav {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 0.5rem 0.65rem !important;
+    gap: 0.4rem !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .top-nav-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 0.4rem !important;
+  }
+
+  .brand {
+    gap: 0.45rem !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  .brand-logo {
+    width: 32px !important;
+    height: 32px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .brand-text h1 {
+    font-size: 0.88rem !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 160px !important;
+  }
+
+  .brand-text p {
+    font-size: 0.65rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 160px !important;
+  }
+
+  .nav-actions {
+    flex-shrink: 0 !important;
+    gap: 4px !important;
+  }
+
+  .btn-open-tab {
+    padding: 4px 7px !important;
+    font-size: 0.7rem !important;
+    border-radius: 12px !important;
+    gap: 3px !important;
+  }
+
+  .user-nav-badge {
+    padding: 3px 6px !important;
+    border-radius: 14px !important;
+    gap: 4px !important;
+  }
+
+  .user-nav-name {
+    font-size: 0.7rem !important;
+    max-width: 75px !important;
+  }
+
+  .nav-label-pc {
+    display: none !important;
+  }
+
+  .nav-label-mobile {
+    display: inline !important;
+  }
+
+  .view-switcher {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    padding: 2px !important;
+    gap: 3px !important;
+    box-sizing: border-box !important;
+    overflow-x: visible !important;
+    background: #f1f5f9 !important;
+    border-radius: 8px !important;
+  }
+
+  .view-switcher::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .view-switcher .view-btn {
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+    white-space: nowrap !important;
+    padding: 6px 2px !important;
+    font-size: 0.72rem !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 3px !important;
+    border-radius: 6px !important;
+  }
+
+  .view-switcher .view-btn svg {
+    width: 13px !important;
+    height: 13px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* --- 2. TV Display View --- */
+  .tv-layout {
+    min-height: auto !important;
+  }
+
+  .tv-audio-banner {
+    top: auto !important;
+    bottom: 55px !important;
+    left: 10px !important;
+    right: 10px !important;
+    padding: 8px 14px !important;
+    font-size: 0.78rem !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .tv-header {
+    flex-direction: column !important;
+    padding: 0.75rem 1rem !important;
+    gap: 0.6rem !important;
+    text-align: center !important;
+  }
+
+  .tv-hospital-name {
+    flex-direction: column !important;
+    font-size: 1.2rem !important;
+    text-align: center !important;
+    gap: 6px !important;
+  }
+
+  .tv-hospital-name > div {
+    text-align: center !important;
+  }
+
+  .tv-clock {
+    font-size: 1.25rem !important;
+    padding: 4px 14px !important;
+  }
+
+  .tv-body {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0.75rem !important;
+    gap: 1rem !important;
+  }
+
+  .tv-left,
+  .tv-right {
+    width: 100% !important;
+    order: unset !important;
+  }
+
+  .current-call-card {
+    min-height: auto !important;
+    padding: 1.25rem 1rem !important;
+  }
+
+  .current-call-label {
+    font-size: 0.92rem !important;
+    letter-spacing: 1.5px !important;
+  }
+
+  .current-call-number {
+    font-size: 3.5rem !important;
+    line-height: 1.1 !important;
+    margin: 0.4rem 0 !important;
+  }
+
+  .current-call-destination {
+    font-size: 1.2rem !important;
+  }
+
+  .tv-queue-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .tv-clinic-box {
+    padding: 0.85rem 1rem !important;
+  }
+
+  .video-player-container {
+    aspect-ratio: 16 / 9 !important;
+    max-height: 250px !important;
+    border-radius: 12px !important;
+  }
+
+  .tv-video-controls {
+    padding: 4px 8px !important;
+    bottom: 6px !important;
+    left: 6px !important;
+    right: 6px !important;
+    gap: 4px !important;
+  }
+
+  .tv-video-controls span {
+    font-size: 0.68rem !important;
+  }
+
+  .tv-video-controls button {
+    padding: 4px 6px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .audio-ducking-indicator {
+    padding: 4px 10px !important;
+    font-size: 0.72rem !important;
+    top: 8px !important;
+    right: 8px !important;
+  }
+
+  .tv-marquee {
+    font-size: 0.95rem !important;
+    padding: 0.65rem 0 !important;
+  }
+
+  /* --- 3. Kiosk View --- */
+  .kiosk-container {
+    padding: 1rem 0.75rem !important;
+  }
+
+  .kiosk-header {
+    margin-bottom: 1.25rem !important;
+  }
+
+  .kiosk-title {
+    font-size: 1.5rem !important;
+  }
+
+  .kiosk-subtitle {
+    font-size: 0.85rem !important;
+  }
+
+  .kiosk-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+  }
+
+  .clinic-card {
+    padding: 1rem !important;
+  }
+
+  .clinic-badge {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1.25rem !important;
+  }
+
+  .clinic-info h3 {
+    font-size: 1.15rem !important;
+  }
+
+  .clinic-info p {
+    font-size: 0.82rem !important;
+  }
+
+  .take-ticket-btn {
+    min-height: 48px !important;
+    font-size: 0.95rem !important;
+    padding: 0.6rem 1rem !important;
+  }
+
+  /* --- 4. Officer Console View --- */
+  .officer-container {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding: 0.75rem !important;
+    gap: 1rem !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+    min-width: 0 !important;
+  }
+
+  .officer-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 1rem !important;
+    min-width: 0 !important;
+  }
+
+  .officer-main {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    gap: 1rem !important;
+  }
+
+  .console-hero {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 1.25rem 0.75rem !important;
+    gap: 1rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .active-ticket-display {
+    font-size: 3.5rem !important;
+    line-height: 1 !important;
+  }
+
+  .action-button-group {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .btn-action {
+    width: 100% !important;
+    min-height: 52px !important;
+    padding: 0.75rem 0.4rem !important;
+    font-size: 0.82rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .queue-table-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 0.85rem !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .table-custom {
+    min-width: 550px !important;
+  }
+
+  /* --- 5. Admin Dashboard View --- */
+  .admin-container {
+    padding: 0.75rem !important;
+    gap: 1rem !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+  }
+
+  .stat-card {
+    padding: 0.75rem !important;
+    gap: 0.6rem !important;
+  }
+
+  .stat-icon {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .stat-val {
+    font-size: 1.3rem !important;
+  }
+
+  .stat-lbl {
+    font-size: 0.72rem !important;
+  }
+
+  .admin-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .admin-card {
+    padding: 0.85rem !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .admin-tabs-bar {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 4px !important;
+  }
+
+  .admin-tabs-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-tabs-bar .view-btn {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    font-size: 0.78rem !important;
+    padding: 6px 10px !important;
+  }
+
+  /* --- 6. Modal Dialogs & Login Card --- */
+  .modal-overlay {
+    padding: 10px !important;
+    align-items: center !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .modal-overlay > div,
+  .modal-box,
+  .modal-card,
+  .modal-content {
+    max-width: 95% !important;
+    width: 95% !important;
+    margin: 10px auto !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+    padding: 1.25rem !important;
+  }
+
+  .login-card-container {
+    width: 92% !important;
+    max-width: 100% !important;
+    margin: 1.5rem auto !important;
+    padding: 1.5rem 1.25rem !important;
+  }
+}
+
+/* Small Smartphone Devices (< 480px) */
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .action-button-group {
+    grid-template-columns: 1fr !important;
+  }
+
+  .current-call-number {
+    font-size: 2.8rem !important;
+  }
+
+  .active-ticket-display {
+    font-size: 2.5rem !important;
+  }
 }

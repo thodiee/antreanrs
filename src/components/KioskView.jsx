@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Ticket, AlertCircle, CheckCircle2, Clock, Printer, CreditCard, Coins, Zap, X } from 'lucide-react';
 import ThermalTicketModal from './ThermalTicketModal';
 
 export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) {
@@ -218,7 +218,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
           gap: '16px',
           border: '2px solid #34d399'
         }}>
-          <span style={{ fontSize: '2.5rem' }}>🖨️</span>
+          <Printer size={36} style={{ color: '#10b981' }} />
           <div>
             <div style={{ fontSize: '1.4rem', fontWeight: '900', letterSpacing: '1px' }}>
               NOMOR ANTREAN: {directPrintToast.ticketNumber}
@@ -242,7 +242,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
           </div>
           {bridgeStatus?.connected && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '700' }}>
-              <span>⚡ Direct Silent Print Aktif ({bridgeStatus.printer || 'Printer Thermal'})</span>
+              <Zap size={14} /> <span>Direct Silent Print Aktif ({bridgeStatus.printer || 'Printer Thermal'})</span>
             </div>
           )}
         </div>
@@ -328,25 +328,6 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
                     </>
                   )}
                 </button>
-
-                {!isDisabled && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenModal(clinic)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      textDecoration: 'underline'
-                    }}
-                  >
-                    📝 Atau masukkan data diri pasien (Opsional)
-                  </button>
-                )}
               </div>
             </div>
           );
@@ -378,9 +359,9 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
               </div>
               <button
                 onClick={() => setActiveClinicModal(null)}
-                style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800', color: '#64748b' }}
+                style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -450,7 +431,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
                       cursor: 'pointer'
                     }}
                   >
-                    💳 BPJS Kesehatan
+                    <CreditCard size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} /> BPJS Kesehatan
                   </button>
 
                   <button
@@ -466,7 +447,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
                       cursor: 'pointer'
                     }}
                   >
-                    💵 Pasien Umum / Mandiri
+                    <Coins size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} /> Pasien Umum / Mandiri
                   </button>
                 </div>
               </div>
@@ -480,7 +461,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
                 onClick={() => handleConfirmTakeTicket(false)}
                 disabled={loadingClinicId === activeClinicModal.id}
               >
-                {loadingClinicId === activeClinicModal.id ? 'Mencetak Ticket...' : '🖨️ Cetak & Simpan Tiket Antrean'}
+                {loadingClinicId === activeClinicModal.id ? 'Mencetak Ticket...' : 'Cetak & Simpan Tiket Antrean'}
               </button>
 
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -488,7 +469,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
                   onClick={() => handleConfirmTakeTicket(true)}
                   style={{ flex: 1, padding: '0.65rem', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '10px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}
                 >
-                  ⚡ Cetak Cepat (Tanpa Nama)
+                  Cetak Cepat (Tanpa Nama)
                 </button>
 
                 <button

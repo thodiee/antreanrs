@@ -233,19 +233,19 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
           </div>
 
           {servingTicket && (
-            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '0.75rem 1.5rem', borderRadius: '12px', marginBottom: '0.75rem', display: 'flex', gap: '1.5rem', justifyContent: 'center', alignItems: 'center' }}>
-              <div>
+            <div className="officer-patient-badge" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '0.75rem 1rem', borderRadius: '12px', marginBottom: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>NAMA PASIEN</span>
                 <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a' }}>{servingTicket.patientName || 'Pasien Umum'}</div>
               </div>
-              <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '1.5rem' }}>
+              <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '0.75rem', textAlign: 'center' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>NIK / RM / TELEPON</span>
                 <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>
                   {servingTicket.nik !== '-' ? servingTicket.nik : (servingTicket.norm !== '-' ? servingTicket.norm : '-')}
                   {servingTicket.phone && servingTicket.phone !== '-' ? ` (${servingTicket.phone})` : ''}
                 </div>
               </div>
-              <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '1.5rem' }}>
+              <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '0.75rem', textAlign: 'center' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>PENJAMIN</span>
                 <div>
                   <span style={{ fontSize: '0.8rem', fontWeight: '900', background: servingTicket.patientType === 'BPJS' ? '#ecfdf5' : '#fef3c7', color: servingTicket.patientType === 'BPJS' ? '#166534' : '#b45309', padding: '3px 10px', borderRadius: '10px' }}>
@@ -256,7 +256,7 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
             </div>
           )}
 
-          <div style={{ fontSize: '1rem', color: '#475569', fontWeight: '600' }}>
+          <div style={{ fontSize: '0.95rem', color: '#475569', fontWeight: '600' }}>
             {servingTicket ? (
               <span>Waktu dipanggil: {new Date(servingTicket.calledAt).toLocaleTimeString('id-ID')} WIB</span>
             ) : (
@@ -290,76 +290,78 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
 
         {/* Queue List Table */}
         <div className="queue-table-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '0.75rem' }}>
             <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: '700' }}>Daftar Antrean Poli {activeClinic?.name} Hari Ini</h3>
             <span style={{ fontSize: '0.85rem', background: '#f1f5f9', padding: '4px 12px', borderRadius: '15px', fontWeight: '600' }}>
               Total: {todayTickets.length} Tiket
             </span>
           </div>
 
-          <table className="table-custom">
-            <thead>
-              <tr>
-                <th>No. Antrean</th>
-                <th>Nama Pasien</th>
-                <th>NIK / RM</th>
-                <th>Penjamin</th>
-                <th>Waktu Ambil</th>
-                <th>Status</th>
-                <th>Loket Pemanggil</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {todayTickets.length === 0 ? (
+          <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="table-custom" style={{ minWidth: '550px', width: '100%' }}>
+              <thead>
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                    Belum ada antrean yang diambil di poliklinik ini hari ini.
-                  </td>
+                  <th>No. Antrean</th>
+                  <th>Nama Pasien</th>
+                  <th>NIK / RM</th>
+                  <th>Penjamin</th>
+                  <th>Waktu Ambil</th>
+                  <th>Status</th>
+                  <th>Loket Pemanggil</th>
+                  <th>Aksi</th>
                 </tr>
-              ) : (
-                todayTickets.map((t) => (
-                  <tr key={t.id} style={{ background: t.id === servingTicket?.id ? '#ecfdf5' : 'transparent' }}>
-                    <td style={{ fontWeight: '800', fontFamily: 'var(--font-heading)', fontSize: '1.1rem', color: t.status === 'CALLED' ? '#15803d' : '#0f172a' }}>
-                      {t.ticketNumber}
-                    </td>
-                    <td style={{ fontWeight: '700', color: '#0f172a' }}>
-                      {t.patientName || 'Pasien Umum'}
-                    </td>
-                    <td style={{ fontSize: '0.85rem', color: '#475569' }}>
-                      {t.nik !== '-' ? t.nik : (t.norm !== '-' ? t.norm : '-')}
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '800', background: t.patientType === 'BPJS' ? '#ecfdf5' : '#fef3c7', color: t.patientType === 'BPJS' ? '#166534' : '#b45309', padding: '2px 8px', borderRadius: '8px' }}>
-                        {t.patientType || 'BPJS'}
-                      </span>
-                    </td>
-                    <td>{new Date(t.createdAt).toLocaleTimeString('id-ID')}</td>
-                    <td>
-                      <span style={{
-                        padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '700',
-                        background: t.status === 'WAITING' ? '#fef3c7' : t.status === 'CALLED' ? '#ecfdf5' : t.status === 'COMPLETED' ? '#d1fae5' : '#fee2e2',
-                        color: t.status === 'WAITING' ? '#d97706' : t.status === 'CALLED' ? '#15803d' : t.status === 'COMPLETED' ? '#047857' : '#b91c1c'
-                      }}>
-                        {t.status}
-                      </span>
-                    </td>
-                    <td>{t.counterName || '-'}</td>
-                    <td>
-                      {t.status === 'SKIPPED' && (
-                        <button
-                          style={{ padding: '4px 10px', background: '#15803d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700' }}
-                          onClick={() => onCallTicket({ ticketId: t.id, counterId: activeCounter.id, counterName: activeCounter.name, officerName }, () => showNotice(`Memanggil kembali antrean ${t.ticketNumber}`))}
-                        >
-                          Panggil Kembali
-                        </button>
-                      )}
+              </thead>
+              <tbody>
+                {todayTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                      Belum ada antrean yang diambil di poliklinik ini hari ini.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  todayTickets.map((t) => (
+                    <tr key={t.id} style={{ background: t.id === servingTicket?.id ? '#ecfdf5' : 'transparent' }}>
+                      <td style={{ fontWeight: '800', fontFamily: 'var(--font-heading)', fontSize: '1.1rem', color: t.status === 'CALLED' ? '#15803d' : '#0f172a' }}>
+                        {t.ticketNumber}
+                      </td>
+                      <td style={{ fontWeight: '700', color: '#0f172a' }}>
+                        {t.patientName || 'Pasien Umum'}
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: '#475569' }}>
+                        {t.nik !== '-' ? t.nik : (t.norm !== '-' ? t.norm : '-')}
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', background: t.patientType === 'BPJS' ? '#ecfdf5' : '#fef3c7', color: t.patientType === 'BPJS' ? '#166534' : '#b45309', padding: '2px 8px', borderRadius: '8px' }}>
+                          {t.patientType || 'BPJS'}
+                        </span>
+                      </td>
+                      <td>{new Date(t.createdAt).toLocaleTimeString('id-ID')}</td>
+                      <td>
+                        <span style={{
+                          padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '700',
+                          background: t.status === 'WAITING' ? '#fef3c7' : t.status === 'CALLED' ? '#ecfdf5' : t.status === 'COMPLETED' ? '#d1fae5' : '#fee2e2',
+                          color: t.status === 'WAITING' ? '#d97706' : t.status === 'CALLED' ? '#15803d' : t.status === 'COMPLETED' ? '#047857' : '#b91c1c'
+                        }}>
+                          {t.status}
+                        </span>
+                      </td>
+                      <td>{t.counterName || '-'}</td>
+                      <td>
+                        {t.status === 'SKIPPED' && (
+                          <button
+                            style={{ padding: '4px 10px', background: '#15803d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700' }}
+                            onClick={() => onCallTicket({ ticketId: t.id, counterId: activeCounter.id, counterName: activeCounter.name, officerName }, () => showNotice(`Memanggil kembali antrean ${t.ticketNumber}`))}
+                          >
+                            Panggil Kembali
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

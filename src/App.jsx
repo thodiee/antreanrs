@@ -29,7 +29,7 @@ class ErrorBoundary extends React.Component {
       return (
         <div style={{ maxWidth: '600px', margin: '4rem auto', padding: '2rem', background: '#fff', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', border: '1px solid #fee2e2' }}>
           <h2 style={{ color: '#dc2626', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            ⚠️ Terjadi Kesalahan Tampilan
+            Terjadi Kesalahan Tampilan
           </h2>
           <p style={{ color: '#475569', marginBottom: '1rem', lineHeight: '1.6' }}>
             Sistem mendeteksi kendala pada antarmuka. Silakan muat ulang halaman atau bersihkan sesi login.
@@ -42,7 +42,7 @@ class ErrorBoundary extends React.Component {
               onClick={() => window.location.reload()}
               style={{ background: '#15803d', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
             >
-              🔄 Muat Ulang Halaman
+              Muat Ulang Halaman
             </button>
             <button
               onClick={() => {
@@ -51,7 +51,7 @@ class ErrorBoundary extends React.Component {
               }}
               style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '10px 18px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
             >
-              🚪 Reset Sesi & Ke Halaman Utama
+              Reset Sesi & Ke Halaman Utama
             </button>
           </div>
         </div>
@@ -330,17 +330,56 @@ export default function App() {
     <div>
       {/* Top Bar for View Switching & User Profile */}
       <header className="top-nav">
-        <div className="brand">
-          <div className="brand-logo" style={{ overflow: 'hidden', padding: data.hospital?.logo ? '2px' : '0' }}>
-            {data.hospital?.logo ? (
-              <img src={data.hospital.logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            ) : (
-              'RS'
-            )}
+        <div className="top-nav-row">
+          <div className="brand">
+            <div className="brand-logo" style={{ overflow: 'hidden', padding: data.hospital?.logo ? '2px' : '0' }}>
+              {data.hospital?.logo ? (
+                <img src={data.hospital.logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              ) : (
+                'RS'
+              )}
+            </div>
+            <div className="brand-text">
+              <h1>{data.hospital?.name || 'Sistem Antrean Poliklinik'}</h1>
+              <p>Sistem Antrean Cerdas 4 Layar (P0)</p>
+            </div>
           </div>
-          <div className="brand-text">
-            <h1>{data.hospital?.name || 'Sistem Antrean Poliklinik'}</h1>
-            <p>Sistem Antrean Cerdas 4 Layar (P0)</p>
+
+          <div className="nav-actions">
+            <button
+              className="btn-open-tab"
+              onClick={() => openInNewTab(currentView)}
+              title="Buka tampilan ini di jendela/tab terpisah"
+            >
+              <ExternalLink size={13} /> <span className="tab-btn-text">Tab Baru</span>
+            </button>
+
+            {currentUser ? (
+              <div className="user-nav-badge">
+                {currentUser.role === 'ADMIN' ? (
+                  <ShieldCheck size={15} style={{ color: '#15803d' }} />
+                ) : currentUser.role === 'PENDAFTARAN' ? (
+                  <Ticket size={15} style={{ color: '#15803d' }} />
+                ) : (
+                  <User size={15} style={{ color: '#0d9488' }} />
+                )}
+                <span className="user-nav-name">
+                  {currentUser.name}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', marginLeft: '2px', padding: '2px' }}
+                  title="Keluar (Logout)"
+                >
+                  <LogOut size={15} />
+                </button>
+              </div>
+            ) : (
+              <div className="status-badge">
+                <span className="status-dot" style={{ background: connected ? '#10b981' : '#ef4444' }}></span>
+                <span>{connected ? 'WebSocket' : 'Offline'}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -348,64 +387,39 @@ export default function App() {
           <button
             className={`view-btn ${currentView === 'kiosk' ? 'active' : ''}`}
             onClick={() => setCurrentView('kiosk')}
+            title="Tampilan Kiosk Mandiri Pasien"
           >
-            <Ticket size={16} /> 1. Kiosk Pasien
+            <Ticket size={15} />
+            <span className="nav-label-pc">Kiosk Pasien</span>
+            <span className="nav-label-mobile">Kiosk</span>
           </button>
           <button
             className={`view-btn ${currentView === 'tv' ? 'active' : ''}`}
             onClick={() => setCurrentView('tv')}
+            title="Tampilan Display Monitor TV"
           >
-            <Tv size={16} /> 2. Display TV
+            <Tv size={15} />
+            <span className="nav-label-pc">Display TV</span>
+            <span className="nav-label-mobile">TV</span>
           </button>
           <button
             className={`view-btn ${currentView === 'officer' ? 'active' : ''}`}
             onClick={() => setCurrentView('officer')}
+            title="Tampilan Layar Pemanggilan Petugas"
           >
-            <UserCheck size={16} /> 3. Layar Petugas
+            <UserCheck size={15} />
+            <span className="nav-label-pc">Layar Petugas</span>
+            <span className="nav-label-mobile">Petugas</span>
           </button>
           <button
             className={`view-btn ${currentView === 'admin' ? 'active' : ''}`}
             onClick={() => setCurrentView('admin')}
+            title="Tampilan Pengaturan & Administrasi"
           >
-            <LayoutDashboard size={16} /> 4. Admin
+            <LayoutDashboard size={15} />
+            <span className="nav-label-pc">Admin</span>
+            <span className="nav-label-mobile">Admin</span>
           </button>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            style={{ fontSize: '0.75rem', padding: '6px 12px', borderRadius: '15px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}
-            onClick={() => openInNewTab(currentView)}
-            title="Buka tampilan ini di jendela/tab terpisah"
-          >
-            <ExternalLink size={14} /> Buka Tab Baru
-          </button>
-
-          {currentUser ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ecfdf5', border: '1.5px solid #fde047', padding: '4px 12px', borderRadius: '20px', boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)' }}>
-              {currentUser.role === 'ADMIN' ? (
-                <ShieldCheck size={16} style={{ color: '#15803d' }} />
-              ) : currentUser.role === 'PENDAFTARAN' ? (
-                <Ticket size={16} style={{ color: '#15803d' }} />
-              ) : (
-                <User size={16} style={{ color: '#0d9488' }} />
-              )}
-              <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#14532d' }}>
-                {currentUser.name} ({currentUser.role})
-              </span>
-              <button
-                onClick={handleLogout}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', marginLeft: '4px' }}
-                title="Keluar (Logout)"
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          ) : (
-            <div className="status-badge">
-              <span className="status-dot" style={{ background: connected ? '#10b981' : '#ef4444' }}></span>
-              <span>{connected ? 'WebSocket Terhubung' : 'Terputus'}</span>
-            </div>
-          )}
         </div>
       </header>
 

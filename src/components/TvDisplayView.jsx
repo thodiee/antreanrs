@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Volume2, VolumeX, Tv, Radio, Sparkles, Clock, Ticket, SkipForward, SkipBack } from 'lucide-react';
+import { Volume2, VolumeX, Tv, Radio, Sparkles, Clock, Ticket, SkipForward, SkipBack, Building2, Lightbulb } from 'lucide-react';
 import { ttsEngine } from '../services/tts';
 import { parseVideoUrl, getLayoutGridTemplate } from '../utils/videoHelper';
 
@@ -392,7 +392,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     )
   );
 
-  // Clinics pagination calculation (4 per page)
+  // Clinics pagination calculation (4 per page paten)
   const CLINICS_PER_PAGE = 4;
   const safeClinics = clinics || [];
   const totalClinicPages = Math.max(1, Math.ceil(safeClinics.length / CLINICS_PER_PAGE));
@@ -401,25 +401,32 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     currentClinicPage * CLINICS_PER_PAGE,
     (currentClinicPage + 1) * CLINICS_PER_PAGE
   );
+  const paddedClinics = useMemo(() => {
+    const list = [...visibleClinics];
+    while (list.length < CLINICS_PER_PAGE) {
+      list.push(null);
+    }
+    return list;
+  }, [visibleClinics]);
 
   const defaultInfoSlides = [
     {
       tag: 'INFORMASI LAYANAN',
-      icon: '🏥',
+      icon: 'hospital',
       title: hospital?.name ? hospital.name.toUpperCase() : 'INFORMASI LAYANAN',
       subtitle: hospital?.tagline || 'Melayani Sepenuh Hati Dengan Sentuhan Kasih',
       description: 'Kami berkomitmen memberikan pelayanan kesehatan berkualitas tinggi dengan fasilitas modern dan tenaga medis profesional.'
     },
     {
       tag: 'ALUR ANTREAN',
-      icon: '🎫',
+      icon: 'ticket',
       title: 'AMBIL TIKET ANTREAN',
       subtitle: 'Gunakan Kiosk Mandiri di Pintu Masuk',
       description: 'Silakan ambil nomor antrean sesuai Poliklinik tujuan Anda dan perhatikan nomor panggil pada Layar Monitor ini.'
     },
     {
       tag: 'EDUKASI KESEHATAN',
-      icon: '💡',
+      icon: 'bulb',
       title: 'JAGA POLA HIDUP SEHAT',
       subtitle: 'Cuci Tangan & Pakai Masker',
       description: 'Selalu terapkan protokol kesehatan, cuci tangan 6 langkah, serta jaga kebersihan di area rumah sakit.'
@@ -438,6 +445,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
       {!audioUnlocked && (
         <div
           onClick={handleUnlockAudio}
+          className="tv-audio-banner"
           style={{
             position: 'fixed',
             top: '16px',
@@ -459,7 +467,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
           }}
         >
           <Volume2 size={20} color="#fef08a" />
-          <span>🔊 Klik untuk Aktifkan Suara TV (Video & Antrean)</span>
+          <span>Klik untuk Aktifkan Suara TV (Video & Antrean)</span>
         </div>
       )}
 
@@ -470,7 +478,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
             {hospital?.logo ? (
               <img src={hospital.logo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
             ) : (
-              <span style={{ fontSize: '1.6rem' }}>🏥</span>
+              <Building2 size={28} color="#15803d" />
             )}
           </div>
           <div>
@@ -541,7 +549,67 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
           )}
 
           <div className="tv-queue-grid">
-            {visibleClinics.map((clinic) => {
+            {paddedClinics.map((clinic, index) => {
+              if (!clinic) {
+                return (
+                  <div key={`empty-slot-${index}`} className="tv-clinic-box tv-clinic-empty-slot" style={{
+                    background: '#ffffff',
+                    border: '1.5px dashed #cbd5e1',
+                    borderRadius: '16px',
+                    padding: '1.1rem 1.25rem',
+                    boxShadow: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    opacity: 0.55
+                  }}>
+                    {/* Top Title Bar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '1px dashed #e2e8f0', paddingBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '900', color: '#94a3b8', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '3px 9px', borderRadius: '10px' }}>
+                          [-]
+                        </span>
+                        <span style={{ fontSize: '1.05rem', fontWeight: '800', color: '#94a3b8' }}>
+                          Ruang Poliklinik
+                        </span>
+                      </div>
+
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: '800',
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        background: '#f1f5f9',
+                        color: '#94a3b8'
+                      }}>
+                        Tidak Aktif
+                      </span>
+                    </div>
+
+                    {/* Grid of Dipanggil vs Terakhir Ambil */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'center' }}>
+                      <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: '1px dashed #e2e8f0' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          DIPANGGIL:
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
+                          -
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: '1px dashed #e2e8f0', textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          TERAKHIR AMBIL:
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
+                          -
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const clinicTickets = todayTickets.filter(t => t.clinicId === clinic.id);
               const waitingCount = clinicTickets.filter(t => t.status === 'WAITING').length;
               
@@ -691,8 +759,8 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
               /* Animated Health & Info Slide Fallback Card */
               <div style={{ flex: 1, padding: '2.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', color: 'white', position: 'relative', background: 'radial-gradient(circle at top right, rgba(255,255,255,0.15), transparent)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px', background: 'rgba(255,255,255,0.2)', padding: '6px 16px', borderRadius: '20px', backdropFilter: 'blur(10px)' }}>
-                    ✨ {currentSlide.tag}
+                  <span style={{ fontSize: '0.85rem', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px', background: 'rgba(255,255,255,0.2)', padding: '6px 16px', borderRadius: '20px', backdropFilter: 'blur(10px)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={14} /> {currentSlide.tag}
                   </span>
                   <span style={{ fontSize: '0.85rem', fontWeight: '700', opacity: 0.8 }}>
                     Info #{infoSlideIndex + 1} / {infoSlides.length}
@@ -700,8 +768,18 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                 </div>
 
                 <div style={{ margin: '2rem 0' }}>
-                  <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>
-                    {currentSlide.icon}
+                  <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center' }}>
+                    {(!currentSlide.icon || currentSlide.icon === '🏥' || currentSlide.icon === 'hospital') ? (
+                      <Building2 size={50} color="#bae6fd" />
+                    ) : (currentSlide.icon === '🎫' || currentSlide.icon === 'ticket') ? (
+                      <Ticket size={50} color="#bae6fd" />
+                    ) : (currentSlide.icon === '💡' || currentSlide.icon === 'bulb' || currentSlide.icon === 'info') ? (
+                      <Lightbulb size={50} color="#bae6fd" />
+                    ) : (currentSlide.icon === '📢' || currentSlide.icon === 'announcement') ? (
+                      <Radio size={50} color="#bae6fd" />
+                    ) : (
+                      <Sparkles size={50} color="#bae6fd" />
+                    )}
                   </div>
                   <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '2rem', fontWeight: '800', lineHeight: 1.2, marginBottom: '0.5rem' }}>
                     {currentSlide.title}
@@ -748,7 +826,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
 
             {/* Playlist Quick Controls (Previous, Next, Status & Sound) */}
             {isVideoPlayable && videoList.length > 1 && (
-              <div style={{
+              <div className="tv-video-controls" style={{
                 position: 'absolute',
                 bottom: '12px',
                 left: '12px',
@@ -839,7 +917,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
       </div>
 
       {/* Marquee Running Text (Emerald Green with Gold Border) */}
-      <div className="tv-marquee" style={{ background: 'linear-gradient(90deg, #14532d 0%, #15803d 50%, #166534 100%)', borderTop: '2.5px solid #eab308', color: '#fef9c3', fontWeight: '700' }}>
+      <div className="tv-marquee" style={{ background: 'linear-gradient(90deg, #14532d 0%, #15803d 50%, #166534 100%)', borderTop: '2.5px solid #eab308', color: '#fef9c3', fontWeight: '700', borderRadius: '5px' }}>
         <div className="marquee-text">
           {hospital?.runningText || `Selamat datang di ${hospital?.name || 'Rumah Sakit'}. Harap siapkan kartu identitas/BPJS Anda.`}
         </div>
