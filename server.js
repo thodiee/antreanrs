@@ -182,14 +182,18 @@ app.post('/api/upload-video', requireAuth(['ADMIN']), (req, res, next) => {
     const videoId = `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
     let nextOrder = 1;
+    const initialVolume = (req.body?.volume !== undefined && !isNaN(parseInt(req.body.volume)))
+      ? Math.max(0, Math.min(100, parseInt(req.body.volume)))
+      : 100;
+
     try {
       const [orderRows] = await pool.query('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM videos');
       nextOrder = (orderRows[0]?.max_order ?? 0) + 1;
       await pool.query(
-        'INSERT INTO videos (id, title, url, duration, sort_order) VALUES (?, ?, ?, ?, ?)',
-        [videoId, rawTitle, relativeUrl, 0, nextOrder]
+        'INSERT INTO videos (id, title, url, duration, sort_order, volume) VALUES (?, ?, ?, ?, ?, ?)',
+        [videoId, rawTitle, relativeUrl, 0, nextOrder, initialVolume]
       );
-      console.log(`[Video-Upload] Video saved to database: ${videoId} (${rawTitle}) with sort_order=${nextOrder}`);
+      console.log(`[Video-Upload] Video saved to database: ${videoId} (${rawTitle}) with sort_order=${nextOrder}, volume=${initialVolume}`);
       
       // Broadcast state update immediately
       const updatedState = await getFullState();
@@ -203,7 +207,8 @@ app.post('/api/upload-video', requireAuth(['ADMIN']), (req, res, next) => {
       title: rawTitle,
       url: relativeUrl,
       duration: 0,
-      sortOrder: nextOrder
+      sortOrder: nextOrder,
+      volume: initialVolume
     };
     console.log(`[Video-Upload] File video uploaded successfully: ${req.file.filename} (${(req.file.size / 1024 / 1024).toFixed(2)} MB)`);
     res.json({ success: true, video: videoObj });
@@ -340,7 +345,7 @@ function maskPatientData(t) {
 // Helper to load current database state with PII masking for non-staff
 async function getFullState(user = null) {
   const [hospitals] = await pool.query('SELECT name, tagline, running_text AS runningText, logo, print_settings AS printSettings, display_settings AS displaySettings FROM hospitals LIMIT 1');
-  const [videos] = await pool.query('SELECT id, title, url, COALESCE(duration, 0) AS duration, COALESCE(sort_order, 0) AS sortOrder FROM videos ORDER BY sort_order ASC, id ASC');
+  const [videos] = await pool.query('SELECT id, title, url, COALESCE(duration, 0) AS duration, COALESCE(sort_order, 0) AS sortOrder, COALESCE(volume, 100) AS volume FROM videos ORDER BY sort_order ASC, id ASC');
   
   // Auto-resolve any short TikTok links in database
   for (const v of videos) {
@@ -391,8 +396,14 @@ async function getFullState(user = null) {
     showLogo: true,
     logoHeight: 60,
     headerSubtitle: 'Sistem Antrean Poliklinik Terpadu',
+    hospitalAddress: '',
+    hospitalPhone: '',
+    showAddress: true,
+    showQrCode: true,
+    qrCodeImage: null,
+    qrCodeSize: 75,
+    qrCodeLabel: '',
     footerText: '* Harap simpan tiket ini hingga dipanggil *\n* Budayakan antre dengan tertib *',
-    showBarcode: true,
     showDateTime: true,
     autoPrint: true,
     quickPrint: true
@@ -880,11 +891,12 @@ async function processSaveSettings(payload) {
         }
 
         const durationVal = (v.duration !== undefined && v.duration !== null && !isNaN(parseInt(v.duration))) ? parseInt(v.duration) : 0;
+        const volumeVal = (v.volume !== undefined && v.volume !== null && !isNaN(parseInt(v.volume))) ? Math.max(0, Math.min(100, parseInt(v.volume))) : 100;
         const sortOrder = i + 1;
 
         await pool.query(
-          `INSERT INTO videos (id, title, url, duration, sort_order) VALUES (?, ?, ?, ?, ?)`,
-          [v.id || `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, v.title, saveUrl, durationVal, sortOrder]
+          `INSERT INTO videos (id, title, url, duration, sort_order, volume) VALUES (?, ?, ?, ?, ?, ?)`,
+          [v.id || `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, v.title, saveUrl, durationVal, sortOrder, volumeVal]
         );
       }
     }

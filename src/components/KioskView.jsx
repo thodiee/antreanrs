@@ -82,6 +82,9 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
         clinicName: ticket.clinicName,
         hospitalName: hospital?.name || 'Rumah Sakit',
         hospitalSubtitle: printSettings.headerSubtitle !== undefined ? printSettings.headerSubtitle : 'Sistem Antrean Poliklinik Terpadu',
+        hospitalAddress: printSettings.hospitalAddress || hospital?.address || '',
+        hospitalPhone: printSettings.hospitalPhone || hospital?.phone || '',
+        showAddress: printSettings.showAddress !== false,
         date: formattedDate,
         time: formattedTime,
         status: 'MENUNGGU',
@@ -89,8 +92,11 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',
         fontSize: printSettings.fontSize || 'medium',
-        showBarcode: printSettings.showBarcode !== false,
         showDateTime: printSettings.showDateTime !== false,
+        showQrCode: printSettings.showQrCode !== false,
+        qrCodeImage: printSettings.qrCodeImage || null,
+        qrCodeSize: printSettings.qrCodeSize || 75,
+        qrCodeLabel: printSettings.qrCodeLabel || '',
         footerText: printSettings.footerText !== undefined ? printSettings.footerText : '* Harap simpan tiket ini hingga dipanggil *\n* Budayakan antre dengan tertib *'
       };
 

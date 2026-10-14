@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Maximize2, MoveHorizontal, X, ExternalLink, Volume2, Building2, Zap, Lightbulb, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Maximize2, MoveHorizontal, X, ExternalLink, Volume2, Volume1, VolumeX, Building2, Zap, Lightbulb, Megaphone, QrCode, MapPin, Phone } from 'lucide-react';
 import ThermalTicketModal from './ThermalTicketModal';
 import { parseVideoUrl } from '../utils/videoHelper';
 
@@ -19,6 +19,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   const [videoModalUrl, setVideoModalUrl] = useState('');
   const [videoModalDuration, setVideoModalDuration] = useState(0);
   const [customModalDuration, setCustomModalDuration] = useState('');
+  const [videoModalVolume, setVideoModalVolume] = useState(30); // 30% default for hospital queue promotion to avoid clashing
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
   const [isResettingShift, setIsResettingShift] = useState(false);
   const [clinicList, setClinicList] = useState(clinics || []);
@@ -57,8 +58,14 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     showLogo: hospital?.printSettings?.showLogo !== false,
     logoHeight: hospital?.printSettings?.logoHeight || 60,
     headerSubtitle: hospital?.printSettings?.headerSubtitle || 'Sistem Antrean Poliklinik Terpadu',
+    hospitalAddress: hospital?.printSettings?.hospitalAddress || '',
+    hospitalPhone: hospital?.printSettings?.hospitalPhone || '',
+    showAddress: hospital?.printSettings?.showAddress !== false,
     footerText: hospital?.printSettings?.footerText || '* Harap simpan tiket ini hingga dipanggil *\n* Budayakan antre dengan tertib *',
-    showBarcode: hospital?.printSettings?.showBarcode !== false,
+    showQrCode: hospital?.printSettings?.showQrCode !== false,
+    qrCodeImage: hospital?.printSettings?.qrCodeImage || '',
+    qrCodeSize: hospital?.printSettings?.qrCodeSize || 75,
+    qrCodeLabel: hospital?.printSettings?.qrCodeLabel || '',
     showDateTime: hospital?.printSettings?.showDateTime !== false,
     autoPrint: hospital?.printSettings?.autoPrint !== false,
     quickPrint: hospital?.printSettings?.quickPrint !== false
@@ -364,6 +371,27 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     reader.readAsDataURL(file);
   };
 
+  const handleQrCodeFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Ukuran file QR Code terlalu besar (maksimal 5MB).', 'danger');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPrintSettings(prev => ({ ...prev, qrCodeImage: reader.result, showQrCode: true }));
+      showToast('Gambar QR Code berhasil diunggah! Tekan "Simpan Pengaturan Format Struk" untuk menyimpan.');
+    };
+    reader.readAsDataURL(file);
+    if (e.target) e.target.value = '';
+  };
+
+  const handleRemoveQrCode = () => {
+    setPrintSettings(prev => ({ ...prev, qrCodeImage: '' }));
+    showToast('Gambar QR Code dihapus.');
+  };
+
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
 
   const handleVideoFileUpload = async (e) => {
@@ -422,6 +450,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     setVideoModalTitle('');
     setVideoModalDuration(0); // 0 = Putar sampai selesai (Otomatis)
     setCustomModalDuration('');
+    setVideoModalVolume(30); // Default 30% pelan agar suara nomor antrean jelas
     setAddVideoModalOpen(true);
   };
 
@@ -466,16 +495,21 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
       ? (parseInt(customModalDuration) || 0)
       : (parseInt(videoModalDuration) || 0);
 
+    const resolvedVolume = (videoModalVolume !== undefined && !isNaN(parseInt(videoModalVolume)))
+      ? Math.max(0, Math.min(100, parseInt(videoModalVolume)))
+      : 30;
+
     const newVid = {
       id: `v_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       title: finalTitle || defaultTitle,
       url: finalUrl,
       duration: resolvedDuration,
+      volume: resolvedVolume,
       thumbnailUrl: finalThumbnail
     };
     setVideoList(prev => [...prev, newVid]);
     setAddVideoModalOpen(false);
-    showToast(`Video "${newVid.title}" berhasil ditambahkan ke playlist!`);
+    showToast(`Video "${newVid.title}" (Volume: ${resolvedVolume}%) berhasil ditambahkan ke playlist!`);
   };
 
   const handleSetAllVideosDuration = (d) => {
@@ -483,6 +517,14 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     setVideoList(videoList.map(v => ({ ...v, duration: d })));
     const label = d === 0 ? 'Putar Sampai Selesai (Otomatis)' : `${d} detik`;
     showToast(`Semua video diatur ke: ${label}`);
+  };
+
+  const handleSetAllVideosVolume = (vol) => {
+    if (videoList.length === 0) return;
+    const clamped = Math.max(0, Math.min(100, parseInt(vol) || 0));
+    setVideoList(videoList.map(v => ({ ...v, volume: clamped })));
+    const label = clamped === 0 ? 'Bisu (0% / Mute)' : `${clamped}%`;
+    showToast(`Volume semua video diatur ke: ${label}. Jangan lupa tekan "Simpan Pengaturan TV"`);
   };
 
   const handleDeleteVideo = (id) => {
@@ -1082,91 +1124,186 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
               {/* Quick Duration Toolbar for Playlist */}
               {videoList.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '10px',
-                  flexWrap: 'wrap',
-                  background: '#f8fafc',
-                  padding: '8px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  marginBottom: '10px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: '800', color: '#334155' }}>
-                    <Clock size={15} color="#15803d" />
-                    <span>Atur Cepat Durasi Playlist:</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                  {/* Baris 1: Atur Cepat Durasi */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    flexWrap: 'wrap',
+                    background: '#f8fafc',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: '800', color: '#334155' }}>
+                      <Clock size={15} color="#15803d" />
+                      <span>Atur Cepat Durasi Playlist:</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosDuration(0)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          border: '1px solid #bbf7d0',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Putar semua video hingga selesai tanpa terpotong"
+                      >
+                        <RefreshCw size={12} /> Semua: Sampai Selesai
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosDuration(60)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: 'white',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Semua: 1 Menit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosDuration(120)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: 'white',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Semua: 2 Menit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosDuration(300)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: 'white',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Semua: 5 Menit
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleSetAllVideosDuration(0)}
-                      style={{
-                        fontSize: '0.73rem',
-                        fontWeight: '700',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        background: '#dcfce7',
-                        color: '#15803d',
-                        border: '1px solid #bbf7d0',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                      title="Putar semua video hingga selesai tanpa terpotong"
-                    >
-                      <RefreshCw size={12} /> Semua: Sampai Selesai
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSetAllVideosDuration(60)}
-                      style={{
-                        fontSize: '0.73rem',
-                        fontWeight: '700',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        background: 'white',
-                        color: '#334155',
-                        border: '1px solid #cbd5e1',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Semua: 1 Menit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSetAllVideosDuration(120)}
-                      style={{
-                        fontSize: '0.73rem',
-                        fontWeight: '700',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        background: 'white',
-                        color: '#334155',
-                        border: '1px solid #cbd5e1',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Semua: 2 Menit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSetAllVideosDuration(300)}
-                      style={{
-                        fontSize: '0.73rem',
-                        fontWeight: '700',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        background: 'white',
-                        color: '#334155',
-                        border: '1px solid #cbd5e1',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Semua: 5 Menit
-                    </button>
+
+                  {/* Baris 2: Atur Cepat Volume (Solusi Tabrakan Suara Panggilan) */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    flexWrap: 'wrap',
+                    background: '#f0fdf4',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: '800', color: '#166534' }}>
+                      <Volume2 size={15} color="#16a34a" />
+                      <span>Atur Cepat Volume Playlist:</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosVolume(30)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: '#15803d',
+                          color: 'white',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}
+                        title="Atur semua video ke 30% agar suara nomor antrean tetap jernih dan terdengar jelas"
+                      >
+                        <Sparkles size={12} /> Semua: 30% (Pelan - Rekomendasi Antrean)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosVolume(0)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: '#fee2e2',
+                          color: '#dc2626',
+                          border: '1px solid #fecaca',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Bisukan semua suara video agar hanya suara nomor antrean yang bersuara di TV"
+                      >
+                        <VolumeX size={12} /> Semua: Bisu (0% / Mute)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosVolume(50)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: 'white',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Semua: 50% (Sedang)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllVideosVolume(100)}
+                        style={{
+                          fontSize: '0.73rem',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: 'white',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Semua: 100% (Penuh)
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1330,65 +1467,149 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                             <div style={{ fontSize: '0.75rem', color: '#64748b', wordBreak: 'break-all', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '320px' }}>
                               Source: {vid.url.length > 70 ? `${vid.url.substr(0, 70)}...` : vid.url}
                             </div>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              background: (!vid.duration || vid.duration === 0) ? '#f0fdf4' : '#f8fafc',
-                              padding: '4px 10px',
-                              borderRadius: '8px',
-                              border: (!vid.duration || vid.duration === 0) ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
-                            }}>
-                              <Clock size={13} style={{ color: (!vid.duration || vid.duration === 0) ? '#16a34a' : '#15803d' }} />
-                              <span style={{ fontSize: '0.72rem', fontWeight: '800', color: (!vid.duration || vid.duration === 0) ? '#15803d' : '#475569' }}>
-                                Durasi:
-                              </span>
-                              <select
-                                value={[0, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800].includes(vid.duration ?? 0) ? (vid.duration ?? 0) : 'custom'}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === 'custom') {
-                                    const inputVal = prompt('Masukkan durasi video dalam satuan detik (contoh: 240 untuk 4 menit, atau 0 untuk sampai selesai):', vid.duration || 60);
-                                    if (inputVal !== null) {
-                                      const parsedD = parseInt(inputVal);
-                                      if (!isNaN(parsedD) && parsedD >= 0) {
-                                        setVideoList(videoList.map(v => v.id === vid.id ? { ...v, duration: parsedD } : v));
-                                      }
-                                    }
-                                  } else {
-                                    const d = parseInt(val);
-                                    setVideoList(videoList.map(v => v.id === vid.id ? { ...v, duration: d } : v));
-                                  }
-                                }}
-                                style={{
-                                  fontSize: '0.73rem',
-                                  fontWeight: '800',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  color: (!vid.duration || vid.duration === 0) ? '#15803d' : '#0f172a',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                <option value={0}>Putar Sampai Selesai (Otomatis)</option>
-                                <option value={15}>15 dtk</option>
-                                <option value={20}>20 dtk</option>
-                                <option value={30}>30 dtk</option>
-                                <option value={45}>45 dtk</option>
-                                <option value={60}>60 dtk (1 mnt)</option>
-                                <option value={90}>90 dtk (1.5 mnt)</option>
-                                <option value={120}>120 dtk (2 mnt)</option>
-                                <option value={180}>180 dtk (3 mnt)</option>
-                                <option value={300}>300 dtk (5 mnt)</option>
-                                <option value={600}>600 dtk (10 mnt)</option>
-                                <option value={900}>900 dtk (15 mnt)</option>
-                                <option value={1800}>1800 dtk (30 mnt)</option>
-                                <option value="custom">Kustom (Ketik Detik)...</option>
-                              </select>
-                              {![0, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800].includes(vid.duration ?? 0) && (
-                                <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#15803d', background: '#ecfdf5', padding: '1px 5px', borderRadius: '4px' }}>
-                                  ({vid.duration}s)
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              {/* 1. Pengaturan Durasi Video */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: (!vid.duration || vid.duration === 0) ? '#f0fdf4' : '#f8fafc',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                border: (!vid.duration || vid.duration === 0) ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
+                              }}>
+                                <Clock size={13} style={{ color: (!vid.duration || vid.duration === 0) ? '#16a34a' : '#15803d' }} />
+                                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: (!vid.duration || vid.duration === 0) ? '#15803d' : '#475569' }}>
+                                  Durasi:
                                 </span>
-                              )}
+                                <select
+                                  value={[0, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800].includes(vid.duration ?? 0) ? (vid.duration ?? 0) : 'custom'}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'custom') {
+                                      const inputVal = prompt('Masukkan durasi video dalam satuan detik (contoh: 240 untuk 4 menit, atau 0 untuk sampai selesai):', vid.duration || 60);
+                                      if (inputVal !== null) {
+                                        const parsedD = parseInt(inputVal);
+                                        if (!isNaN(parsedD) && parsedD >= 0) {
+                                          setVideoList(videoList.map(v => v.id === vid.id ? { ...v, duration: parsedD } : v));
+                                        }
+                                      }
+                                    } else {
+                                      const d = parseInt(val);
+                                      setVideoList(videoList.map(v => v.id === vid.id ? { ...v, duration: d } : v));
+                                    }
+                                  }}
+                                  style={{
+                                    fontSize: '0.73rem',
+                                    fontWeight: '800',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: (!vid.duration || vid.duration === 0) ? '#15803d' : '#0f172a',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <option value={0}>Putar Sampai Selesai (Otomatis)</option>
+                                  <option value={15}>15 dtk</option>
+                                  <option value={20}>20 dtk</option>
+                                  <option value={30}>30 dtk</option>
+                                  <option value={45}>45 dtk</option>
+                                  <option value={60}>60 dtk (1 mnt)</option>
+                                  <option value={90}>90 dtk (1.5 mnt)</option>
+                                  <option value={120}>120 dtk (2 mnt)</option>
+                                  <option value={180}>180 dtk (3 mnt)</option>
+                                  <option value={300}>300 dtk (5 mnt)</option>
+                                  <option value={600}>600 dtk (10 mnt)</option>
+                                  <option value={900}>900 dtk (15 mnt)</option>
+                                  <option value={1800}>1800 dtk (30 mnt)</option>
+                                  <option value="custom">Kustom (Ketik Detik)...</option>
+                                </select>
+                                {![0, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800].includes(vid.duration ?? 0) && (
+                                  <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#15803d', background: '#ecfdf5', padding: '1px 5px', borderRadius: '4px' }}>
+                                    ({vid.duration}s)
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* 2. Pengatur Volume Tiap Video (Solusi Tabrakan Suara Panggilan) */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: (vid.volume === 0) ? '#fef2f2' : (vid.volume !== undefined && vid.volume <= 30) ? '#ecfdf5' : '#f8fafc',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                border: (vid.volume === 0) ? '1px solid #fecaca' : (vid.volume !== undefined && vid.volume <= 30) ? '1px solid #a7f3d0' : '1px solid #cbd5e1'
+                              }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentV = vid.volume !== undefined ? vid.volume : 100;
+                                    const nextV = currentV === 0 ? 30 : 0;
+                                    setVideoList(videoList.map(v => v.id === vid.id ? { ...v, volume: nextV } : v));
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    padding: '0',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    color: (vid.volume === 0) ? '#dc2626' : (vid.volume !== undefined && vid.volume <= 30) ? '#16a34a' : '#0284c7'
+                                  }}
+                                  title={vid.volume === 0 ? 'Klik untuk aktifkan suara video (Unmute)' : 'Klik untuk bisukan video ini (Mute)'}
+                                >
+                                  {vid.volume === 0 ? (
+                                    <VolumeX size={14} />
+                                  ) : (vid.volume !== undefined && vid.volume <= 50) ? (
+                                    <Volume1 size={14} />
+                                  ) : (
+                                    <Volume2 size={14} />
+                                  )}
+                                </button>
+                                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: (vid.volume === 0) ? '#dc2626' : (vid.volume !== undefined && vid.volume <= 30) ? '#15803d' : '#475569' }}>
+                                  Volume:
+                                </span>
+                                <select
+                                  value={[0, 15, 30, 50, 70, 80, 100].includes(vid.volume ?? 100) ? (vid.volume ?? 100) : 'custom'}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'custom') {
+                                      const inputVal = prompt('Masukkan volume video dalam persentase (0 s/d 100%):', vid.volume !== undefined ? vid.volume : 100);
+                                      if (inputVal !== null) {
+                                        const parsedV = parseInt(inputVal);
+                                        if (!isNaN(parsedV)) {
+                                          const clamped = Math.max(0, Math.min(100, parsedV));
+                                          setVideoList(videoList.map(v => v.id === vid.id ? { ...v, volume: clamped } : v));
+                                        }
+                                      }
+                                    } else {
+                                      const vNum = parseInt(val);
+                                      setVideoList(videoList.map(v => v.id === vid.id ? { ...v, volume: vNum } : v));
+                                    }
+                                  }}
+                                  style={{
+                                    fontSize: '0.73rem',
+                                    fontWeight: '800',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: (vid.volume === 0) ? '#dc2626' : (vid.volume !== undefined && vid.volume <= 30) ? '#15803d' : '#0f172a',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <option value={100}>100% (Normal)</option>
+                                  <option value={80}>80%</option>
+                                  <option value={50}>50% (Sedang)</option>
+                                  <option value={30}>30% (Pelan - Rekomendasi)</option>
+                                  <option value={15}>15% (Sangat Pelan)</option>
+                                  <option value={0}>0% (Bisu / Mute)</option>
+                                  <option value="custom">Kustom (% Khusus)...</option>
+                                </select>
+                                {![0, 15, 30, 50, 70, 80, 100].includes(vid.volume ?? 100) && (
+                                  <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#15803d', background: '#ecfdf5', padding: '1px 5px', borderRadius: '4px' }}>
+                                    ({vid.volume}%)
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1884,8 +2105,55 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                   />
                 </div>
 
-                {/* 5. Toggles for items */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {/* 5. Alamat & Kontak Rumah Sakit pada Struk */}
+                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={printSettings.showAddress}
+                        onChange={(e) => setPrintSettings({ ...printSettings, showAddress: e.target.checked })}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={16} color="#15803d" /> Tampilkan Alamat & Kontak pada Struk
+                      </span>
+                    </label>
+                  </div>
+
+                  {printSettings.showAddress && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <MapPin size={14} color="#64748b" /> Alamat Rumah Sakit / Faskes (Baris 1)
+                        </label>
+                        <input
+                          type="text"
+                          value={printSettings.hospitalAddress || ''}
+                          onChange={(e) => setPrintSettings({ ...printSettings, hospitalAddress: e.target.value })}
+                          placeholder="Contoh: Jl. Raya Sukowati No. 123, Sragen"
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <Phone size={14} color="#64748b" /> Kontak / No. Telepon / WhatsApp (Baris 2)
+                        </label>
+                        <input
+                          type="text"
+                          value={printSettings.hospitalPhone || ''}
+                          onChange={(e) => setPrintSettings({ ...printSettings, hospitalPhone: e.target.value })}
+                          placeholder="Contoh: Telp: (0271) 891000 | WA: 0812-3456-7890"
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 6. Tampilkan Tanggal & Jam */}
+                <div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: '700', color: '#334155', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
@@ -1893,18 +2161,152 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                       onChange={(e) => setPrintSettings({ ...printSettings, showDateTime: e.target.checked })}
                       style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                     />
-                    <span>Tampilkan Tanggal & Jam</span>
+                    <span>Tampilkan Tanggal & Jam Pembuatan Tiket</span>
                   </label>
+                </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: '700', color: '#334155', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={printSettings.showBarcode}
-                      onChange={(e) => setPrintSettings({ ...printSettings, showBarcode: e.target.checked })}
-                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                    />
-                    <span>Tampilkan Barcode Visual</span>
-                  </label>
+                {/* 7. QR Code Struk (Pengganti Barcode) */}
+                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={printSettings.showQrCode}
+                        onChange={(e) => setPrintSettings({ ...printSettings, showQrCode: e.target.checked })}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <QrCode size={16} color="#15803d" /> Tampilkan QR Code pada Struk Tiket (Pengganti Barcode)
+                      </span>
+                    </label>
+
+                    {printSettings.qrCodeImage ? (
+                      <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '700', background: '#ecfdf5', padding: '2px 8px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Check size={13} /> Gambar QR Terpasang
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', background: '#f1f5f9', padding: '2px 8px', borderRadius: '8px' }}>
+                        QR Standar (Belum Upload)
+                      </span>
+                    )}
+                  </div>
+
+                  {printSettings.showQrCode && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Upload Box */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        background: 'white',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1'
+                      }}>
+                        <div style={{
+                          width: '70px',
+                          height: '70px',
+                          borderRadius: '8px',
+                          background: '#f8fafc',
+                          border: '1px dashed #94a3b8',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          flexShrink: 0
+                        }}>
+                          {printSettings.qrCodeImage ? (
+                            <img
+                              src={printSettings.qrCodeImage}
+                              alt="QR Code Struk"
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            />
+                          ) : (
+                            <QrCode size={36} color="#94a3b8" />
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>
+                            Upload Gambar QR Code
+                          </div>
+                          <div style={{ fontSize: '0.73rem', color: '#64748b', lineHeight: 1.3 }}>
+                            Unggah file gambar QR Code (format .png, .jpg, .webp). Cocok untuk QR Pendaftaran Online, QR Survei Kepuasan, atau link Website RS.
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                            <input
+                              type="file"
+                              id="qrcode-file-input"
+                              accept="image/*"
+                              onChange={handleQrCodeFileUpload}
+                              style={{ display: 'none' }}
+                            />
+                            <label
+                              htmlFor="qrcode-file-input"
+                              className="btn-primary"
+                              style={{ padding: '5px 12px', fontSize: '0.78rem', cursor: 'pointer', borderRadius: '6px' }}
+                            >
+                              <Upload size={13} /> {printSettings.qrCodeImage ? 'Ganti QR Code' : 'Pilih File QR Code'}
+                            </label>
+
+                            {printSettings.qrCodeImage && (
+                              <button
+                                type="button"
+                                onClick={handleRemoveQrCode}
+                                style={{
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  border: '1px solid #fecaca',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <Trash2 size={13} /> Hapus
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Slider Ukuran QR Code */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          <span>Ukuran QR Code pada Struk:</span>
+                          <span style={{ color: '#15803d', fontWeight: '800' }}>{printSettings.qrCodeSize || 75} px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="40"
+                          max="120"
+                          step="5"
+                          value={printSettings.qrCodeSize || 75}
+                          onChange={(e) => setPrintSettings({ ...printSettings, qrCodeSize: parseInt(e.target.value) })}
+                          style={{ width: '100%', cursor: 'pointer' }}
+                        />
+                      </div>
+
+                      {/* Label Teks di Bawah QR Code */}
+                      <div>
+                        <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>
+                          Label Teks di Bawah QR Code (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          value={printSettings.qrCodeLabel || ''}
+                          onChange={(e) => setPrintSettings({ ...printSettings, qrCodeLabel: e.target.value })}
+                          placeholder="Contoh: Scan QR untuk Pendaftaran Online / Info RS"
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 6. Footer Notes */}
@@ -2057,9 +2459,15 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                 <div className="thermal-header">
                   <h4>{hospitalForm.name || 'RUMAH SAKIT'}</h4>
                   {printSettings.headerSubtitle && (
-                    <p style={{ fontSize: '0.75em', color: '#475569', margin: '4px 0 0 0' }}>
+                    <p style={{ fontSize: '0.75em', color: '#475569', margin: '3px 0 0 0' }}>
                       {printSettings.headerSubtitle}
                     </p>
+                  )}
+                  {printSettings.showAddress && (printSettings.hospitalAddress || printSettings.hospitalPhone) && (
+                    <div style={{ fontSize: '0.68em', color: '#334155', margin: '3px 0 0 0', lineHeight: 1.3 }}>
+                      {printSettings.hospitalAddress && <div>{printSettings.hospitalAddress}</div>}
+                      {printSettings.hospitalPhone && <div>Telp/WA: {printSettings.hospitalPhone}</div>}
+                    </div>
                   )}
                   <div style={{ borderBottom: '1px dashed #000', margin: '0.5rem 0' }}></div>
                 </div>
@@ -2088,15 +2496,45 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                   <div>Status  : <strong>MENUNGGU</strong></div>
                 </div>
 
-                {/* Barcode & Footer */}
+                {/* QR Code & Footer */}
                 <div style={{ margin: '0.75rem 0 0.25rem 0' }}>
-                  {printSettings.showBarcode && (
-                    <div style={{
-                      height: printSettings.paperWidth === '80mm' ? '38px' : '28px',
-                      background: 'repeating-linear-gradient(90deg, #000 0, #000 2px, #fff 2px, #fff 4px, #000 4px, #000 7px)',
-                      width: '85%',
-                      margin: '0 auto 6px auto'
-                    }}></div>
+                  {printSettings.showQrCode && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 auto 8px auto' }}>
+                      {printSettings.qrCodeImage ? (
+                        <img
+                          src={printSettings.qrCodeImage}
+                          alt="QR Code"
+                          style={{
+                            width: `${printSettings.qrCodeSize || 75}px`,
+                            height: `${printSettings.qrCodeSize || 75}px`,
+                            objectFit: 'contain',
+                            filter: 'contrast(150%)'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: `${printSettings.qrCodeSize || 75}px`,
+                          height: `${printSettings.qrCodeSize || 75}px`,
+                          border: '1px dashed #475569',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                          color: '#64748b',
+                          background: '#f8fafc'
+                        }}>
+                          <QrCode size={Math.min(32, Math.max(16, (printSettings.qrCodeSize || 75) * 0.45))} />
+                          <span style={{ fontSize: '9px', fontWeight: 'bold' }}>QR Code</span>
+                        </div>
+                      )}
+                      {printSettings.qrCodeLabel && (
+                        <div style={{ fontSize: '0.68em', color: '#334155', fontWeight: '600', marginTop: '4px', textAlign: 'center' }}>
+                          {printSettings.qrCodeLabel}
+                        </div>
+                      )}
+                    </div>
                   )}
                   {printSettings.footerText && (
                     <div style={{ fontSize: '0.7em', color: '#475569', whiteSpace: 'pre-line', lineHeight: 1.4 }}>
@@ -2618,6 +3056,27 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
                 <div style={{ fontSize: '0.75rem', color: '#15803d', background: '#ecfdf5', padding: '6px 10px', borderRadius: '6px', border: '1px solid #a7f3d0', marginTop: '6px', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Sparkles size={14} /> <span><strong>Rekomendasi:</strong> Pilih <strong>"Putar Sampai Selesai (Otomatis)"</strong> agar video dari link YouTube / file video diputar penuh sampai video selesai tanpa terpotong di tengah jalan.</span>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <Volume2 size={16} style={{ color: '#15803d' }} /> Pengaturan Volume Suara Video
+                </label>
+                <select
+                  value={videoModalVolume}
+                  onChange={(e) => setVideoModalVolume(parseInt(e.target.value))}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: '700' }}
+                >
+                  <option value={30}>30% (Pelan - Sangat Direkomendasikan agar panggilan antrean jelas)</option>
+                  <option value={50}>50% (Sedang)</option>
+                  <option value={80}>80%</option>
+                  <option value={100}>100% (Penuh / Normal)</option>
+                  <option value={15}>15% (Sangat Pelan)</option>
+                  <option value={0}>0% (Bisu / Mute)</option>
+                </select>
+                <div style={{ fontSize: '0.75rem', color: '#0369a1', background: '#f0f9ff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #bae6fd', marginTop: '6px', lineHeight: 1.4 }}>
+                  💡 <strong>Solusi Tabrakan Suara:</strong> Volume 30% atau mute disarankan agar suara video tidak bertabrakan dengan pengumuman nomor antrean di ruang tunggu.
                 </div>
               </div>
 

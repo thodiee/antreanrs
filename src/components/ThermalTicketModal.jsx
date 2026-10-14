@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, X } from 'lucide-react';
+import { Printer, X, QrCode } from 'lucide-react';
 
 export default function ThermalTicketModal({ ticket, hospital, hospitalName, onClose }) {
   const [countdown, setCountdown] = useState(6);
@@ -11,8 +11,14 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
     showLogo: true,
     logoHeight: 60,
     headerSubtitle: 'Sistem Antrean Poliklinik Terpadu',
+    hospitalAddress: activeHospital.address || '',
+    hospitalPhone: activeHospital.phone || '',
+    showAddress: true,
+    showQrCode: true,
+    qrCodeImage: null,
+    qrCodeSize: 75,
+    qrCodeLabel: '',
     footerText: '* Harap simpan tiket ini hingga dipanggil *\n* Budayakan antre dengan tertib *',
-    showBarcode: true,
     showDateTime: true,
     autoPrint: true
   };
@@ -39,6 +45,9 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
         clinicName: ticket.clinicName,
         hospitalName: activeHospital.name || 'Rumah Sakit',
         hospitalSubtitle: printSettings.headerSubtitle !== undefined ? printSettings.headerSubtitle : 'Sistem Antrean Poliklinik Terpadu',
+        hospitalAddress: printSettings.hospitalAddress || activeHospital.address || '',
+        hospitalPhone: printSettings.hospitalPhone || activeHospital.phone || '',
+        showAddress: printSettings.showAddress !== false,
         date: formattedDate,
         time: formattedTime,
         status: 'MENUNGGU',
@@ -46,8 +55,11 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',
         fontSize: printSettings.fontSize || 'medium',
-        showBarcode: printSettings.showBarcode !== false,
         showDateTime: printSettings.showDateTime !== false,
+        showQrCode: printSettings.showQrCode !== false,
+        qrCodeImage: printSettings.qrCodeImage || null,
+        qrCodeSize: printSettings.qrCodeSize || 75,
+        qrCodeLabel: printSettings.qrCodeLabel || '',
         footerText: printSettings.footerText !== undefined ? printSettings.footerText : '* Harap simpan tiket ini hingga dipanggil *\n* Budayakan antre dengan tertib *'
       };
 
@@ -172,9 +184,19 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
           <div className="thermal-header">
             <h4>{activeHospital.name || 'Rumah Sakit'}</h4>
             {printSettings.headerSubtitle && (
-              <p style={{ fontSize: '0.75em', color: '#475569', margin: '4px 0 0 0' }}>
+              <p style={{ fontSize: '0.75em', color: '#475569', margin: '3px 0 0 0' }}>
                 {printSettings.headerSubtitle}
               </p>
+            )}
+            {printSettings.showAddress !== false && (printSettings.hospitalAddress || printSettings.hospitalPhone || activeHospital.address || activeHospital.phone) && (
+              <div style={{ fontSize: '0.68em', color: '#334155', margin: '3px 0 0 0', lineHeight: 1.3 }}>
+                {(printSettings.hospitalAddress || activeHospital.address) && (
+                  <div>{printSettings.hospitalAddress || activeHospital.address}</div>
+                )}
+                {(printSettings.hospitalPhone || activeHospital.phone) && (
+                  <div>Telp/WA: {printSettings.hospitalPhone || activeHospital.phone}</div>
+                )}
+              </div>
             )}
             <div style={{ borderBottom: '1px dashed #000', margin: '0.5rem 0' }}></div>
           </div>
@@ -203,15 +225,45 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
             <div>Status  : <strong>MENUNGGU</strong></div>
           </div>
 
-          {/* Footer & Barcode Mockup */}
+          {/* Footer & QR Code */}
           <div style={{ margin: '0.75rem 0 0.25rem 0' }}>
-            {printSettings.showBarcode && (
-              <div style={{
-                height: printSettings.paperWidth === '80mm' ? '38px' : '28px',
-                background: 'repeating-linear-gradient(90deg, #000 0, #000 2px, #fff 2px, #fff 4px, #000 4px, #000 7px)',
-                width: '85%',
-                margin: '0 auto 6px auto'
-              }}></div>
+            {printSettings.showQrCode !== false && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 auto 8px auto' }}>
+                {printSettings.qrCodeImage ? (
+                  <img
+                    src={printSettings.qrCodeImage}
+                    alt="QR Code"
+                    style={{
+                      width: `${printSettings.qrCodeSize || 75}px`,
+                      height: `${printSettings.qrCodeSize || 75}px`,
+                      objectFit: 'contain',
+                      filter: 'contrast(150%)'
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: `${printSettings.qrCodeSize || 75}px`,
+                    height: `${printSettings.qrCodeSize || 75}px`,
+                    border: '1px dashed #475569',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px',
+                    color: '#64748b',
+                    background: '#f8fafc'
+                  }}>
+                    <QrCode size={Math.min(32, Math.max(16, (printSettings.qrCodeSize || 75) * 0.45))} />
+                    <span style={{ fontSize: '9px', fontWeight: 'bold' }}>QR Code</span>
+                  </div>
+                )}
+                {printSettings.qrCodeLabel && (
+                  <div style={{ fontSize: '0.68em', color: '#334155', fontWeight: '600', marginTop: '4px', textAlign: 'center' }}>
+                    {printSettings.qrCodeLabel}
+                  </div>
+                )}
+              </div>
             )}
             {printSettings.footerText && (
               <div style={{ fontSize: '0.7em', color: '#475569', whiteSpace: 'pre-line', lineHeight: 1.4 }}>

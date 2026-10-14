@@ -16,9 +16,114 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
   const [isVideoDucked, setIsVideoDucked] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [clinicPageIndex, setClinicPageIndex] = useState(0);
+  const [failedVideoIds, setFailedVideoIds] = useState(new Set());
+  const [infoSlideIndex, setInfoSlideIndex] = useState(0);
 
   const videoRef = useRef(null);
   const iframeRef = useRef(null);
+
+  const rawVideos = hospital?.videoList || [];
+  const videoList = rawVideos.length > 0 ? rawVideos : [
+    { id: 'v1', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', title: 'Profil RSUD', duration: 30, volume: 100 }
+  ];
+
+  const isSingleVideo = videoList.length <= 1;
+  const currentVid = videoList[currentVideoIndex % videoList.length];
+
+  const parsedVideo = useMemo(() => {
+    if (!currentVid) return { type: 'unknown', url: '', embedUrl: '' };
+    if (currentVid.localUrl) {
+      return {
+        type: 'direct',
+        url: currentVid.localUrl,
+        embedUrl: currentVid.localUrl
+      };
+    }
+    return parseVideoUrl(currentVid.url, !audioUnlocked, isSingleVideo);
+  }, [currentVid, audioUnlocked, isSingleVideo]);
+
+  const displaySettings = hospital?.displaySettings || {
+    layoutRatio: '50-50',
+    aspectRatio: '16-9',
+    objectFit: 'contain',
+    position: 'right'
+  };
+
+  // Helper refs to prevent stale closures in audio & tts callbacks
+  const currentVidRef = useRef(currentVid);
+  const audioUnlockedRef = useRef(audioUnlocked);
+  const isVideoDuckedRef = useRef(isVideoDucked);
+
+  useEffect(() => {
+    currentVidRef.current = currentVid;
+  }, [currentVid]);
+
+  useEffect(() => {
+    audioUnlockedRef.current = audioUnlocked;
+  }, [audioUnlocked]);
+
+  useEffect(() => {
+    isVideoDuckedRef.current = isVideoDucked;
+  }, [isVideoDucked]);
+
+  // Hitung target volume video (0 s/d 1.0) berdasarkan konfigurasi per video
+  const getVideoTargetVolume = (vid = currentVidRef.current) => {
+    if (!vid) return 1.0;
+    const vol = vid.volume !== undefined && vid.volume !== null ? Number(vid.volume) : 100;
+    if (isNaN(vol)) return 1.0;
+    return Math.max(0, Math.min(100, vol)) / 100;
+  };
+
+  // Handshake helper to command YouTube iframe
+  const sendYouTubeCommand = (func, args = []) => {
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+      }
+    } catch (e) {}
+  };
+
+  // Fungsi sentral untuk menerapkan volume & mute ke video lokal atau YouTube
+  const applyVideoAudioState = (vid = currentVidRef.current, ducked = isVideoDuckedRef.current, unlocked = audioUnlockedRef.current) => {
+    const rawTargetVol = getVideoTargetVolume(vid);
+    if (videoRef.current) {
+      if (ducked || rawTargetVol === 0 || !unlocked) {
+        videoRef.current.volume = 0;
+        videoRef.current.muted = true;
+      } else {
+        videoRef.current.volume = rawTargetVol;
+        videoRef.current.muted = false;
+      }
+    }
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      if (ducked || rawTargetVol === 0 || !unlocked) {
+        sendYouTubeCommand('mute');
+        sendYouTubeCommand('setVolume', [0]);
+      } else {
+        sendYouTubeCommand('unMute');
+        sendYouTubeCommand('setVolume', [Math.round(rawTargetVol * 100)]);
+      }
+    }
+  };
+
+  const initYouTubePlayer = () => {
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
+        const rawTargetVol = getVideoTargetVolume(currentVidRef.current);
+        const unlocked = audioUnlockedRef.current;
+        const ducked = isVideoDuckedRef.current;
+        if (unlocked && !ducked && rawTargetVol > 0) {
+          sendYouTubeCommand('unMute');
+          sendYouTubeCommand('setVolume', [Math.round(rawTargetVol * 100)]);
+        } else {
+          sendYouTubeCommand('mute');
+          sendYouTubeCommand('setVolume', [0]);
+        }
+        sendYouTubeCommand('playVideo');
+      }
+    } catch (e) {}
+  };
 
   // Digital clock update
   useEffect(() => {
@@ -54,8 +159,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
         window.speechSynthesis.getVoices();
       }
       if (videoRef.current) {
-        videoRef.current.muted = false;
-        videoRef.current.volume = 1.0;
+        applyVideoAudioState(currentVid, isVideoDucked, audioUnlocked);
         videoRef.current.play().catch(() => {
           // If browser policy requires gesture before first unmuted play, fallback to muted then unmute on first gesture
           if (videoRef.current) {
@@ -73,10 +177,8 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
   useEffect(() => {
     const unlockAudio = () => {
       setAudioUnlocked(true);
-      if (videoRef.current) {
-        videoRef.current.muted = false;
-        videoRef.current.volume = 1.0;
-      }
+      audioUnlockedRef.current = true;
+      applyVideoAudioState(currentVidRef.current, isVideoDuckedRef.current, true);
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
@@ -99,24 +201,54 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     };
   }, []);
 
-  // Setup TTS audio ducking callbacks
+  // Setup TTS audio ducking callbacks: Hilangkan tabrakan suara dengan membisukan video saat nomor dipanggil
   useEffect(() => {
     ttsEngine.setDuckingCallbacks(
       () => {
         setIsVideoDucked(true);
-        if (videoRef.current) videoRef.current.volume = 0.15; // Duck volume to 15%
+        isVideoDuckedRef.current = true;
+        // Bisukan video total (volume 0 & muted) selama nomor antrean dipanggil agar tidak bertabrakan!
+        if (videoRef.current) {
+          videoRef.current.volume = 0;
+          videoRef.current.muted = true;
+        }
+        sendYouTubeCommand('mute');
+        sendYouTubeCommand('setVolume', [0]);
       },
       () => {
         setIsVideoDucked(false);
-        if (videoRef.current) videoRef.current.volume = 1.0; // Restore volume to 100%
+        isVideoDuckedRef.current = false;
+        // Kembalikan ke volume yang diatur per video setelah pemanggilan selesai
+        const vid = currentVidRef.current;
+        const unlocked = audioUnlockedRef.current;
+        const rawTargetVol = getVideoTargetVolume(vid);
+        if (videoRef.current) {
+          if (rawTargetVol === 0 || !unlocked) {
+            videoRef.current.volume = 0;
+            videoRef.current.muted = true;
+          } else {
+            videoRef.current.volume = rawTargetVol;
+            videoRef.current.muted = false;
+          }
+        }
+        if (unlocked && rawTargetVol > 0) {
+          sendYouTubeCommand('unMute');
+          sendYouTubeCommand('setVolume', [Math.round(rawTargetVol * 100)]);
+        }
       }
     );
   }, []);
+
+  // Terapkan volume & mute setiap kali video berganti atau status audio berubah
+  useEffect(() => {
+    applyVideoAudioState(currentVid, isVideoDucked, audioUnlocked);
+  }, [currentVid, isVideoDucked, audioUnlocked]);
 
   // Trigger TTS voice when new call arrives
   useEffect(() => {
     if (lastCall && lastCall.ticket) {
       setAudioUnlocked(true);
+      audioUnlockedRef.current = true;
       ttsEngine.speakCall(
         lastCall.ticket,
         lastCall.ticket.counterName,
@@ -128,23 +260,18 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
   const handleUnlockAudio = (e) => {
     e?.stopPropagation();
     setAudioUnlocked(true);
+    audioUnlockedRef.current = true;
     try {
       localStorage.setItem('tv_audio_unlocked', '1');
     } catch {}
     ttsEngine.playChime();
+    applyVideoAudioState(currentVidRef.current, isVideoDuckedRef.current, true);
     if (videoRef.current) {
-      videoRef.current.muted = false;
-      videoRef.current.volume = 1.0;
       videoRef.current.play().catch(err => console.warn('Video play error:', err));
     }
-    // Unmute YouTube iframe via postMessage
-    try {
-      if (iframeRef.current && iframeRef.current.contentWindow) {
-        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }), '*');
-        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-      }
-    } catch (err) {}
+    if (parsedVideo.type === 'youtube') {
+      sendYouTubeCommand('playVideo');
+    }
   };
 
   const handleToggleAudio = (e) => {
@@ -153,12 +280,8 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
       handleUnlockAudio();
     } else {
       setAudioUnlocked(false);
-      if (videoRef.current) videoRef.current.muted = true;
-      try {
-        if (iframeRef.current && iframeRef.current.contentWindow) {
-          iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
-        }
-      } catch (err) {}
+      audioUnlockedRef.current = false;
+      applyVideoAudioState(currentVidRef.current, isVideoDuckedRef.current, false);
     }
   };
 
@@ -168,36 +291,6 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     }
   };
 
-  const [failedVideoIds, setFailedVideoIds] = useState(new Set());
-  const [infoSlideIndex, setInfoSlideIndex] = useState(0);
-
-  const rawVideos = hospital?.videoList || [];
-  const videoList = rawVideos.length > 0 ? rawVideos : [
-    { id: 'v1', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', title: 'Profil RSUD', duration: 30 }
-  ];
-
-  const isSingleVideo = videoList.length <= 1;
-  const currentVid = videoList[currentVideoIndex % videoList.length];
-
-  const parsedVideo = useMemo(() => {
-    if (!currentVid) return { type: 'unknown', url: '', embedUrl: '' };
-    if (currentVid.localUrl) {
-      return {
-        type: 'direct',
-        url: currentVid.localUrl,
-        embedUrl: currentVid.localUrl
-      };
-    }
-    return parseVideoUrl(currentVid.url, !audioUnlocked, isSingleVideo);
-  }, [currentVid, audioUnlocked, isSingleVideo]);
-
-  const displaySettings = hospital?.displaySettings || {
-    layoutRatio: '50-50',
-    aspectRatio: '16-9',
-    objectFit: 'contain',
-    position: 'right'
-  };
-
   // Rotate info slides if video is not available or fails
   useEffect(() => {
     const timer = setInterval(() => {
@@ -205,28 +298,6 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     }, 6000);
     return () => clearInterval(timer);
   }, []);
-
-  // Handshake helper to command YouTube iframe
-  const sendYouTubeCommand = (func, args = []) => {
-    try {
-      if (iframeRef.current && iframeRef.current.contentWindow) {
-        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
-      }
-    } catch (e) {}
-  };
-
-  const initYouTubePlayer = () => {
-    try {
-      if (iframeRef.current && iframeRef.current.contentWindow) {
-        iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
-        if (audioUnlocked) {
-          sendYouTubeCommand('unMute');
-          sendYouTubeCommand('setVolume', [100]);
-        }
-        sendYouTubeCommand('playVideo');
-      }
-    } catch (e) {}
-  };
 
   // Listen to YouTube Iframe postMessage events (onStateChange=0 ENDED triggers immediate video rotation)
   useEffect(() => {
@@ -328,8 +399,7 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     if (parsedVideo.type === 'direct' && videoRef.current) {
       try {
         videoRef.current.load();
-        videoRef.current.muted = false;
-        videoRef.current.volume = 1.0;
+        applyVideoAudioState(currentVid, isVideoDucked, audioUnlocked);
         const playPromise = videoRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(err => {
@@ -814,12 +884,27 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
               {isVideoDucked ? (
                 <>
                   <Volume2 size={16} style={{ color: '#15803d', animation: 'bounce 1s infinite' }} />
-                  <span style={{ fontWeight: '800', color: '#15803d' }}>Suara Panggilan Aktif</span>
+                  <span style={{ fontWeight: '800', color: '#15803d' }}>Panggilan Suara Aktif (Video Dibisukan Otomatis)</span>
                 </>
               ) : (
                 <>
                   <Volume2 size={16} style={{ color: '#0d9488' }} />
-                  <span>Media Promosi: <strong>{isVideoPlayable ? (currentVid?.title || 'Video RS') : currentSlide.title}</strong></span>
+                  <span>Media Promosi: <strong>{isVideoPlayable ? (currentVid?.title || 'Video RS') : currentSlide.title}</strong>
+                    {isVideoPlayable && (
+                      <span style={{
+                        marginLeft: '8px',
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: (!audioUnlocked || currentVid?.volume === 0) ? '#fee2e2' : '#f0fdf4',
+                        color: (!audioUnlocked || currentVid?.volume === 0) ? '#dc2626' : '#15803d',
+                        border: (!audioUnlocked || currentVid?.volume === 0) ? '1px solid #fecaca' : '1px solid #bbf7d0'
+                      }}>
+                        {(!audioUnlocked || currentVid?.volume === 0) ? 'Bisu (Mute)' : `Vol: ${currentVid?.volume ?? 100}%`}
+                      </span>
+                    )}
+                  </span>
                 </>
               )}
             </div>
@@ -876,6 +961,18 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: '800',
+                    color: (!audioUnlocked || (currentVid?.volume ?? 100) === 0) ? '#fca5a5' : '#86efac',
+                    background: 'rgba(0,0,0,0.35)',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                  }}>
+                    {(!audioUnlocked || (currentVid?.volume ?? 100) === 0) ? 'Bisu' : `Vol: ${currentVid?.volume ?? 100}%`}
+                  </span>
+
                   <button
                     type="button"
                     onClick={handleToggleAudio}

@@ -38,7 +38,7 @@ export async function initDatabase() {
         tagline VARCHAR(255),
         running_text TEXT,
         logo LONGTEXT,
-        print_settings TEXT,
+        print_settings LONGTEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       );
 
@@ -47,7 +47,8 @@ export async function initDatabase() {
         title VARCHAR(255) NOT NULL,
         url LONGTEXT NOT NULL,
         duration INT DEFAULT 0,
-        sort_order INT DEFAULT 0
+        sort_order INT DEFAULT 0,
+        volume INT DEFAULT 100
       );
 
       CREATE TABLE IF NOT EXISTS info_slides (
@@ -130,10 +131,11 @@ export async function initDatabase() {
       // Column already exists
     }
     try {
-      await pool.query('ALTER TABLE hospitals ADD COLUMN print_settings TEXT DEFAULT NULL');
-    } catch {
-      // Column already exists
-    }
+      await pool.query('ALTER TABLE hospitals ADD COLUMN print_settings LONGTEXT DEFAULT NULL');
+    } catch {}
+    try {
+      await pool.query('ALTER TABLE hospitals MODIFY COLUMN print_settings LONGTEXT DEFAULT NULL');
+    } catch {}
     try {
       await pool.query('ALTER TABLE videos MODIFY COLUMN url LONGTEXT NOT NULL');
     } catch {
@@ -161,12 +163,15 @@ export async function initDatabase() {
       await pool.query('ALTER TABLE hospitals ADD COLUMN display_settings TEXT');
     } catch {}
 
-    // Auto-migrate videos duration & sort_order column
+    // Auto-migrate videos duration & sort_order & volume column
     try {
       await pool.query('ALTER TABLE videos ADD COLUMN duration INT DEFAULT 0');
     } catch {}
     try {
       await pool.query('ALTER TABLE videos ADD COLUMN sort_order INT DEFAULT 0');
+    } catch {}
+    try {
+      await pool.query('ALTER TABLE videos ADD COLUMN volume INT DEFAULT 100');
     } catch {}
 
     // Migration for Patient details in tickets table

@@ -62,9 +62,16 @@ function Print-ThermalTicket {
         $estHeight = 150
         if (-not [string]::IsNullOrWhiteSpace($ticket.logoBase64)) { $estHeight += 60 }
         if (-not [string]::IsNullOrWhiteSpace($ticket.hospitalSubtitle)) { $estHeight += 18 }
+        if ($ticket.showAddress -ne $false) {
+            if (-not [string]::IsNullOrWhiteSpace($ticket.hospitalAddress)) { $estHeight += 16 }
+            if (-not [string]::IsNullOrWhiteSpace($ticket.hospitalPhone)) { $estHeight += 16 }
+        }
         if ($ticket.sequence) { $estHeight += 18 }
         if ($ticket.showDateTime -ne $false) { $estHeight += 30 }
-        if ($ticket.showBarcode -ne $false) { $estHeight += 30 }
+        if ($ticket.showQrCode -ne $false -and -not [string]::IsNullOrWhiteSpace($ticket.qrCodeImage)) {
+            $qrH = if ($ticket.qrCodeSize) { [int]$ticket.qrCodeSize } else { 75 }
+            $estHeight += $qrH + 16
+        }
         if (-not [string]::IsNullOrWhiteSpace($ticket.footerText)) {
             $fLines = ($ticket.footerText -split "`r?`n").Count
             $estHeight += ($fLines * 14) + 8
@@ -173,7 +180,22 @@ function Print-ThermalTicket {
             if (-not [string]::IsNullOrWhiteSpace($t.hospitalSubtitle)) {
                 $subSize = $g.MeasureString($t.hospitalSubtitle, $fSub, [int]$w, $sfCenter)
                 $g.DrawString($t.hospitalSubtitle, $fSub, $brushBlack, (New-Object System.Drawing.RectangleF(0, $y, $w, $subSize.Height)), $sfCenter)
-                $y += $subSize.Height + 4
+                $y += $subSize.Height + 2
+            }
+
+            # 3b. Alamat & Kontak Rumah Sakit (Rata Tengah)
+            if ($t.showAddress -ne $false) {
+                if (-not [string]::IsNullOrWhiteSpace($t.hospitalAddress)) {
+                    $addrSize = $g.MeasureString($t.hospitalAddress, $fSub, [int]$w, $sfCenter)
+                    $g.DrawString($t.hospitalAddress, $fSub, $brushBlack, (New-Object System.Drawing.RectangleF(0, $y, $w, $addrSize.Height)), $sfCenter)
+                    $y += $addrSize.Height + 2
+                }
+                if (-not [string]::IsNullOrWhiteSpace($t.hospitalPhone)) {
+                    $phoneTxt = "Telp/WA: " + $t.hospitalPhone
+                    $pSize = $g.MeasureString($phoneTxt, $fSub, [int]$w, $sfCenter)
+                    $g.DrawString($phoneTxt, $fSub, $brushBlack, (New-Object System.Drawing.RectangleF(0, $y, $w, $pSize.Height)), $sfCenter)
+                    $y += $pSize.Height + 2
+                }
             }
 
             # 4. Garis Putus-putus Atas
@@ -224,23 +246,34 @@ function Print-ThermalTicket {
             $g.DrawString("MENUNGGU", $fDetailsBold, $brushBlack, ($leftPad + (46 * $fScale)), $y)
             $y += $lineStep + 6
 
-            # 10. Barcode Mockup Sesuai Layout Web
-            if ($t.showBarcode -ne $false) {
-                $bcW = [int]($w * 0.82)
-                $bcH = if ($is80mm) { 26 } else { 20 }
-                $bcX = [int](($w - $bcW) / 2)
-                $curX = $bcX
-                while ($curX -lt ($bcX + $bcW)) {
-                    $bar1 = [Math]::Min(2, ($bcX + $bcW) - $curX)
-                    $g.FillRectangle($brushBlack, $curX, $y, $bar1, $bcH)
-                    $curX += 4
-                    if ($curX -lt ($bcX + $bcW)) {
-                        $bar2 = [Math]::Min(3, ($bcX + $bcW) - $curX)
-                        $g.FillRectangle($brushBlack, $curX, $y, $bar2, $bcH)
-                        $curX += 3
+            # 10. QR Code Image & Label (Pengganti Barcode)
+            if ($t.showQrCode -ne $false -and -not [string]::IsNullOrWhiteSpace($t.qrCodeImage)) {
+                try {
+                    $b64Qr = $t.qrCodeImage
+                    if ($b64Qr -match "base64,(.+)$") {
+                        $b64Qr = $matches[1]
                     }
-                }
-                $y += $bcH + 6
+                    $qrBytes = [System.Convert]::FromBase64String($b64Qr)
+                    $qrMs = New-Object System.IO.MemoryStream($qrBytes, 0, $qrBytes.Length)
+                    $qrImg = [System.Drawing.Image]::FromStream($qrMs)
+
+                    $qrTargetW = if ($t.qrCodeSize) { [int]$t.qrCodeSize } else { if ($is80mm) { 85 } else { 70 } }
+                    $qrTargetW = [Math]::Min($qrTargetW, [int]($w * 0.75))
+                    $qrTargetH = $qrTargetW
+                    $qrX = [int](($w - $qrTargetW) / 2)
+
+                    $g.DrawImage($qrImg, $qrX, $y, $qrTargetW, $qrTargetH)
+                    $y += $qrTargetH + 4
+
+                    if (-not [string]::IsNullOrWhiteSpace($t.qrCodeLabel)) {
+                        $lblSize = $g.MeasureString($t.qrCodeLabel, $fFooter, [int]$w, $sfCenter)
+                        $g.DrawString($t.qrCodeLabel, $fFooter, $brushBlack, (New-Object System.Drawing.RectangleF(0, $y, $w, $lblSize.Height)), $sfCenter)
+                        $y += $lblSize.Height + 4
+                    }
+
+                    $qrImg.Dispose()
+                    $qrMs.Dispose()
+                } catch {}
             }
 
             # 11. Footer Text (Multi-line, Rata Tengah)
