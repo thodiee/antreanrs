@@ -1,11 +1,16 @@
+try {
+  process.loadEnvFile?.();
+} catch {}
+
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'admin123',
-  multipleStatements: true,
+  password: process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : '',
+  multipleStatements: false,
 };
 
 const DB_NAME = process.env.DB_NAME || 'antrean_rs';
@@ -255,11 +260,12 @@ export async function initDatabase() {
     }
 
     // Seed default Users: Admin, Pendaftaran, Poliklinik, Farmasi
+    // Password dibaca dari environment variable (.env) atau di-generate acak jika belum didefinisikan
     const defaultUsers = [
       {
         id: 'u_admin',
         username: 'admin',
-        pass: 'admin123',
+        pass: process.env.INITIAL_ADMIN_PASSWORD || null,
         name: 'Super Administrator',
         role: 'ADMIN',
         clinicId: null
@@ -267,7 +273,7 @@ export async function initDatabase() {
       {
         id: 'u_pendaftaran',
         username: 'pendaftaran',
-        pass: 'pendaftaran123',
+        pass: process.env.INITIAL_PENDAFTARAN_PASSWORD || null,
         name: 'Petugas Pendaftaran & Kiosk',
         role: 'PENDAFTARAN',
         clinicId: null
@@ -275,7 +281,7 @@ export async function initDatabase() {
       {
         id: 'u_poliklinik',
         username: 'poliklinik',
-        pass: 'poli123',
+        pass: process.env.INITIAL_POLIKLINIK_PASSWORD || null,
         name: 'Petugas Poliklinik',
         role: 'POLIKLINIK',
         clinicId: 'c1'
@@ -283,7 +289,7 @@ export async function initDatabase() {
       {
         id: 'u_farmasi',
         username: 'farmasi',
-        pass: 'farmasi123',
+        pass: process.env.INITIAL_FARMASI_PASSWORD || null,
         name: 'Petugas Farmasi & Apotek',
         role: 'FARMASI',
         clinicId: 'c6'
@@ -293,11 +299,15 @@ export async function initDatabase() {
     for (const u of defaultUsers) {
       const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [u.username]);
       if (existing.length === 0) {
-        const passHash = await bcrypt.hash(u.pass, 10);
+        const rawPassword = u.pass || crypto.randomBytes(6).toString('hex');
+        const passHash = await bcrypt.hash(rawPassword, 10);
         await pool.query(
           `INSERT INTO users (id, username, password, name, role, assigned_clinic_id) VALUES (?, ?, ?, ?, ?, ?)`,
           [u.id, u.username, passHash, u.name, u.role, u.clinicId]
         );
+        if (!u.pass) {
+          console.warn(`[Security Alert] Akun '${u.username}' dibuat dengan password acak: ${rawPassword}. Harap catat dan segera ganti di menu Admin.`);
+        }
       }
     }
 

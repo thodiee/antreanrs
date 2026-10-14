@@ -185,6 +185,10 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
       const clinicIdStr = userForm.assignedClinicIds.length > 0 ? userForm.assignedClinicIds.join(',') : null;
       if (editingUser) {
         // Edit existing
+        if (userForm.password && userForm.password.trim().length < 6) {
+          showToast('Password baru minimal terdiri dari 6 karakter.', 'danger');
+          return;
+        }
         const res = await fetch(`/api/users/${editingUser.id}`, {
           method: 'PUT',
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -208,6 +212,10 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         // Create new
         if (!userForm.username || !userForm.password) {
           showToast('Username dan password wajib diisi untuk pengguna baru.', 'danger');
+          return;
+        }
+        if (userForm.password.trim().length < 6) {
+          showToast('Password minimal terdiri dari 6 karakter.', 'danger');
           return;
         }
         const res = await fetch('/api/users', {

@@ -1,3 +1,7 @@
+try {
+  process.loadEnvFile?.();
+} catch {}
+
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -5,6 +9,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
@@ -16,7 +21,13 @@ import { initDatabase } from './db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'antreanrs-secure-jwt-secret-key-2026';
+// Kunci JWT diambil dari environment variable (.env)
+// Jika tidak didefinisikan, dibuat kunci acak aman dalam memori saat server berjalan
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  const generatedSecret = crypto.randomBytes(32).toString('hex');
+  console.warn('[Security Notice] JWT_SECRET tidak didefinisikan pada .env. Menggunakan kunci acak sementara.');
+  return generatedSecret;
+})();
 
 // Helper to sign JWT
 export function signUserToken(user) {
@@ -106,11 +117,13 @@ const generalApiLimiter = rateLimit({
   legacyHeaders: false
 });
 
+const allowedOrigin = process.env.CORS_ORIGIN || '*';
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: allowedOrigin,
     methods: ['GET', 'POST'],
   },
   maxHttpBufferSize: 2e7, // Limit socket buffer to 20 MB (safe from memory exhaustion)
@@ -122,7 +135,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-app.use(cors());
+app.use(cors(allowedOrigin === '*' ? {} : { origin: allowedOrigin }));
 app.use('/api', generalApiLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -509,7 +522,7 @@ async function getFullState(user = null) {
   };
 }
 
-// Authentication API with rate limiter & JWT token issuance
+// Authentication API with rate limiter & anti-enumeration protection
 app.post('/api/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -517,16 +530,19 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username dan password wajib diisi.' });
     }
 
-    const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+    const cleanUsername = String(username).trim();
+    const cleanPassword = String(password);
+
+    const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [cleanUsername]);
     const user = rows[0];
 
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Username tidak ditemukan.' });
-    }
+    // Mitigasi timing attack & user enumeration: selalu jalankan bcrypt compare dengan dummy hash
+    const dummyHash = '$2b$10$wT8m9bK9qH5QoG7P3uXpbe9jW7H5v9Z7QoG7P3uXpbe9jW7H5v9Z7';
+    const hashToCompare = user ? user.password : dummyHash;
+    const match = await bcrypt.compare(cleanPassword, hashToCompare);
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(401).json({ success: false, error: 'Password yang Anda masukkan salah.' });
+    if (!user || !match) {
+      return res.status(401).json({ success: false, error: 'Username atau password tidak valid.' });
     }
 
     const assignedClinicId = user.assigned_clinic_id || '';
@@ -583,6 +599,10 @@ app.post('/api/users', requireAuth(['ADMIN']), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username, password, nama, dan role wajib diisi.' });
     }
 
+    if (String(password).length < 6) {
+      return res.status(400).json({ success: false, error: 'Password minimal terdiri dari 6 karakter.' });
+    }
+
     const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
     if (existing.length > 0) {
       return res.status(400).json({ success: false, error: 'Username sudah digunakan.' });
@@ -627,6 +647,9 @@ app.put('/api/users/:id', requireAuth(['ADMIN']), async (req, res) => {
     }
 
     if (password && password.trim()) {
+      if (password.trim().length < 6) {
+        return res.status(400).json({ success: false, error: 'Password baru minimal terdiri dari 6 karakter.' });
+      }
       const passHash = await bcrypt.hash(password.trim(), 10);
       await pool.query(
         'UPDATE users SET name = ?, role = ?, assigned_clinic_id = ?, password = ? WHERE id = ?',
@@ -1093,11 +1116,11 @@ io.on('connection', async (socket) => {
       const ticketId = `tkt_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
       const createdAtStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-      const safePatientName = (patientName && String(patientName).trim()) ? String(patientName).trim() : 'Pasien Umum';
-      const safeNik = (nik && String(nik).trim()) ? String(nik).trim() : '-';
-      const safeNorm = (norm && String(norm).trim()) ? String(norm).trim() : '-';
-      const safePhone = (phone && String(phone).trim()) ? String(phone).trim() : '-';
-      const safePatientType = (patientType && String(patientType).trim()) ? String(patientType).trim() : 'BPJS';
+      const safePatientName = (patientName && String(patientName).trim()) ? String(patientName).trim().substring(0, 100) : 'Pasien Umum';
+      const safeNik = (nik && String(nik).trim()) ? String(nik).trim().substring(0, 30) : '-';
+      const safeNorm = (norm && String(norm).trim()) ? String(norm).trim().substring(0, 30) : '-';
+      const safePhone = (phone && String(phone).trim()) ? String(phone).trim().substring(0, 30) : '-';
+      const safePatientType = (patientType && String(patientType).trim()) ? String(patientType).trim().substring(0, 20) : 'BPJS';
 
       await pool.query(
         `INSERT INTO tickets (id, ticket_number, sequence, clinic_id, clinic_name, prefix, patient_name, nik, norm, phone, patient_type, date, status, created_at)

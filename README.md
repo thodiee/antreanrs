@@ -13,14 +13,16 @@ Sistem antrean poliklinik dan rumah sakit cerdas berbasis web real-time dengan i
 
 ---
 
-## 🔑 Akun Default
+## 🔑 Akun & Kredensial Awal
 
-| Role | Username | Password | Akses Layar |
+Kredensial pengguna awal dikonfigurasi melalui berkas `.env` (`INITIAL_ADMIN_PASSWORD`, dll). Jika tidak diatur, sistem akan men-generate password acak yang aman saat inisialisasi awal.
+
+| Role | Username | Password Awal | Akses Layar |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin` | `admin123` | Semua Layar & Dashboard Admin |
-| **Pendaftaran** | `pendaftaran` | `pendaftaran123` | Kiosk Mandiri Pasien |
-| **Poliklinik** | `poliklinik` | `poli123` | Konsol Petugas Poliklinik |
-| **Farmasi** | `farmasi` | `farmasi123` | Konsol Petugas Farmasi |
+| **Admin** | `admin` | *Dikonfigurasi di `.env`* | Semua Layar & Dashboard Admin |
+| **Pendaftaran** | `pendaftaran` | *Dikonfigurasi di `.env`* | Kiosk Mandiri Pasien |
+| **Poliklinik** | `poliklinik` | *Dikonfigurasi di `.env`* | Konsol Petugas Poliklinik |
+| **Farmasi** | `farmasi` | *Dikonfigurasi di `.env`* | Konsol Petugas Farmasi |
 
 ---
 
@@ -32,16 +34,17 @@ npm install
 ```
 
 ### 2. Konfigurasi Lingkungan (`.env`)
-Salin berkas konfigurasi:
+Salin berkas konfigurasi template:
 ```bash
 cp .env.example .env
 ```
-Sesuaikan password MySQL/MariaDB pada file `.env` jika diperlukan:
+Sesuaikan password MySQL/MariaDB dan kunci rahasia pada file `.env`:
 ```env
 DB_HOST=localhost
 DB_USER=root
-DB_PASSWORD=admin123
+DB_PASSWORD=PasswordDatabaseAnda
 DB_NAME=antrean_rs
+JWT_SECRET=KunciRahasiaJWT32KarakterAcak
 PORT=3001
 ```
 
