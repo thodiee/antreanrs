@@ -87,7 +87,6 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
         showAddress: printSettings.showAddress !== false,
         date: formattedDate,
         time: formattedTime,
-        status: 'MENUNGGU',
         logoBase64: (printSettings.showLogo !== false && hospital?.logo) ? hospital.logo : null,
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',

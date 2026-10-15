@@ -50,7 +50,6 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
         showAddress: printSettings.showAddress !== false,
         date: formattedDate,
         time: formattedTime,
-        status: 'MENUNGGU',
         logoBase64: (printSettings.showLogo !== false && activeHospital.logo) ? activeHospital.logo : null,
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',
