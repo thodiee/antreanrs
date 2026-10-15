@@ -575,6 +575,49 @@ app.post('/api/login', loginLimiter, async (req, res) => {
   }
 });
 
+// Verify token and fetch updated user profile
+app.get('/api/auth/me', requireAuth(), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, username, name, role, assigned_clinic_id AS assignedClinicId FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    const user = rows[0];
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'User tidak ditemukan atau telah dihapus.' });
+    }
+
+    const assignedClinicId = user.assignedClinicId || '';
+    const assignedClinicIds = assignedClinicId ? assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        assignedClinicId,
+        assignedClinicIds
+      }
+    });
+  } catch (err) {
+    console.error('Auth verification error:', err);
+    res.status(500).json({ success: false, error: 'Gagal memverifikasi sesi login.' });
+  }
+});
+
+// Health check endpoint to inspect server and database connectivity
+app.get('/api/health', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT 1 AS ok');
+    res.json({ success: true, db: 'connected', timestamp: new Date().toISOString() });
+  } catch (err) {
+    console.error('Health check database error:', err);
+    res.status(500).json({ success: false, db: 'disconnected', error: err.message });
+  }
+});
+
 // User Management APIs - Strictly Admin Only
 app.get('/api/users', requireAuth(['ADMIN']), async (req, res) => {
   try {

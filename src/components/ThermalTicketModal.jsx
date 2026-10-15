@@ -214,16 +214,12 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
 
           <div style={{ borderBottom: '1px dashed #000', margin: '0.5rem 0' }}></div>
 
-          {/* Details */}
-          <div style={{ fontSize: '0.78em', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '3px' }}>
             {printSettings.showDateTime && (
-              <>
+              <div style={{ fontSize: '0.78em', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 <div>Tanggal : {formattedDate}</div>
                 <div>Pukul   : {formattedTime} WIB</div>
-              </>
+              </div>
             )}
-            <div>Status  : <strong>MENUNGGU</strong></div>
-          </div>
 
           {/* Footer & QR Code */}
           <div style={{ margin: '0.75rem 0 0.25rem 0' }}>

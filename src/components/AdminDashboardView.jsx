@@ -13,7 +13,11 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     layoutRatio: hospital?.displaySettings?.layoutRatio || '50-50',
     aspectRatio: hospital?.displaySettings?.aspectRatio || '16-9',
     objectFit: hospital?.displaySettings?.objectFit || 'contain',
-    position: hospital?.displaySettings?.position || 'right'
+    position: hospital?.displaySettings?.position || 'right',
+    clinicNameFontSize: hospital?.displaySettings?.clinicNameFontSize || '1.35',
+    queueNumberFontSize: hospital?.displaySettings?.queueNumberFontSize || '2.7',
+    activeCallNumberFontSize: hospital?.displaySettings?.activeCallNumberFontSize || '7.5',
+    activeCallDestFontSize: hospital?.displaySettings?.activeCallDestFontSize || '2.25'
   });
   const [addVideoModalOpen, setAddVideoModalOpen] = useState(false);
   const [videoModalUrl, setVideoModalUrl] = useState('');
@@ -1735,6 +1739,102 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                     Tentukan apakah video berada di sebelah kanan atau sebelah kiri layar TV.
                   </div>
                 </div>
+
+                {/* 5. Ukuran Font Nama Poliklinik */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    🔤 Ukuran Font Nama Poli (Katalog Bawah)
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="1.8"
+                      step="0.05"
+                      value={displaySettings.clinicNameFontSize || '1.35'}
+                      onChange={(e) => setDisplaySettings({ ...displaySettings, clinicNameFontSize: e.target.value })}
+                      style={{ flex: 1, accentColor: '#16a34a' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#16a34a', minWidth: '55px', textAlign: 'right' }}>
+                      {displaySettings.clinicNameFontSize || '1.35'} rem
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                    Atur besaran huruf judul poliklinik agar terbaca jelas dari kejauhan.
+                  </div>
+                </div>
+
+                {/* 6. Ukuran Font Nomor Antrean */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    🔢 Ukuran Font Nomor Antrean (Dipanggil & Terakhir Ambil)
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="range"
+                      min="1.8"
+                      max="3.4"
+                      step="0.1"
+                      value={displaySettings.queueNumberFontSize || '2.7'}
+                      onChange={(e) => setDisplaySettings({ ...displaySettings, queueNumberFontSize: e.target.value })}
+                      style={{ flex: 1, accentColor: '#16a34a' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#16a34a', minWidth: '55px', textAlign: 'right' }}>
+                      {displaySettings.queueNumberFontSize || '2.7'} rem
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                    Atur besaran angka nomor antrean (misal B-001, D-003) di setiap kartu poliklinik.
+                  </div>
+                </div>
+
+                {/* 7. Ukuran Font Nomor Panggilan Aktif (D-001) */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    📢 Ukuran Font Nomor Panggilan Aktif (Atas)
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="range"
+                      min="5.0"
+                      max="11.0"
+                      step="0.5"
+                      value={displaySettings.activeCallNumberFontSize || '7.5'}
+                      onChange={(e) => setDisplaySettings({ ...displaySettings, activeCallNumberFontSize: e.target.value })}
+                      style={{ flex: 1, accentColor: '#16a34a' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#16a34a', minWidth: '55px', textAlign: 'right' }}>
+                      {displaySettings.activeCallNumberFontSize || '7.5'} rem
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                    Atur ukuran teks nomor antrean besar yang sedang dipanggil saat ini (banner hijau atas).
+                  </div>
+                </div>
+
+                {/* 8. Ukuran Font Loket & Poli Panggilan Aktif */}
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    🏷️ Ukuran Font Loket / Poli Panggilan Aktif
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="range"
+                      min="1.5"
+                      max="3.5"
+                      step="0.1"
+                      value={displaySettings.activeCallDestFontSize || '2.25'}
+                      onChange={(e) => setDisplaySettings({ ...displaySettings, activeCallDestFontSize: e.target.value })}
+                      style={{ flex: 1, accentColor: '#16a34a' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#16a34a', minWidth: '55px', textAlign: 'right' }}>
+                      {displaySettings.activeCallDestFontSize || '2.25'} rem
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                    Atur besaran teks nama loket & poliklinik tujuan di bawah nomor panggilan aktif.
+                  </div>
+                </div>
               </div>
 
               {/* Live Miniature Preview of the TV Screen */}
@@ -2493,16 +2593,12 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
                 <div style={{ borderBottom: '1px dashed #000', margin: '0.5rem 0' }}></div>
 
-                {/* Details */}
-                <div style={{ fontSize: '0.78em', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   {printSettings.showDateTime && (
-                    <>
+                    <div style={{ fontSize: '0.78em', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                       <div>Tanggal : {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</div>
                       <div>Pukul   : {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB</div>
-                    </>
+                    </div>
                   )}
-                  <div>Status  : <strong>MENUNGGU</strong></div>
-                </div>
 
                 {/* QR Code & Footer */}
                 <div style={{ margin: '0.75rem 0 0.25rem 0' }}>

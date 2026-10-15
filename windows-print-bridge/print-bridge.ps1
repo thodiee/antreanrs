@@ -241,10 +241,7 @@ function Print-ThermalTicket {
                     $y += $lineStep
                 }
             }
-            # Status: MENUNGGU
-            $g.DrawString("Status  : ", $fDetails, $brushBlack, $leftPad, $y)
-            $g.DrawString("MENUNGGU", $fDetailsBold, $brushBlack, ($leftPad + (46 * $fScale)), $y)
-            $y += $lineStep + 6
+            $y += 6
 
             # 10. QR Code Image & Label (Pengganti Barcode)
             if ($t.showQrCode -ne $false -and -not [string]::IsNullOrWhiteSpace($t.qrCodeImage)) {
@@ -327,7 +324,6 @@ Urutan Ke-$($ticket.sequence)
 $div
 Tanggal : $($ticket.date)
 Pukul   : $($ticket.time) WIB
-Status  : MENUNGGU
 $div
 $($ticket.footerText)
 

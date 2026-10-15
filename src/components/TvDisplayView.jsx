@@ -46,7 +46,11 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     layoutRatio: '50-50',
     aspectRatio: '16-9',
     objectFit: 'contain',
-    position: 'right'
+    position: 'right',
+    clinicNameFontSize: '1.35',
+    queueNumberFontSize: '2.7',
+    activeCallNumberFontSize: '7.5',
+    activeCallDestFontSize: '2.25'
   };
 
   // Helper refs to prevent stale closures in audio & tts callbacks
@@ -588,8 +592,16 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
           {latestCallTicket ? (
             <div className="current-call-card">
               <div className="current-call-label">PANGGILAN AKTIF SAAT INI</div>
-              <div className="current-call-number">{latestCallTicket.ticketNumber}</div>
-              <div className="current-call-destination">
+              <div
+                className="current-call-number"
+                style={{ fontSize: `${displaySettings.activeCallNumberFontSize || 7.5}rem` }}
+              >
+                {latestCallTicket.ticketNumber}
+              </div>
+              <div
+                className="current-call-destination"
+                style={{ fontSize: `${displaySettings.activeCallDestFontSize || 2.25}rem` }}
+              >
                 {latestCallTicket.counterName ? `${latestCallTicket.counterName} • ` : ''}{latestCallTicket.clinicName}
               </div>
             </div>
@@ -699,63 +711,65 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                   background: '#ffffff',
                   border: isCallActive ? '2.5px solid #15803d' : '1px solid #cbd5e1',
                   borderRadius: '16px',
-                  padding: '1.1rem 1.25rem',
+                  padding: '0.75rem 1rem',
                   boxShadow: isCallActive ? '0 4px 18px rgba(234, 179, 8, 0.35)' : '0 4px 12px rgba(0,0,0,0.04)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px'
+                  gap: '8px'
                 }}>
                   {/* Top Title Bar */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: '900', color: '#15803d', background: '#ecfdf5', border: '1px solid #bbf7d0', padding: '3px 9px', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.95rem', fontWeight: '900', color: '#15803d', background: '#ecfdf5', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '8px', flexShrink: 0 }}>
                         [{clinic.prefix}]
                       </span>
-                      <span style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a' }}>
+                      <span style={{ fontSize: `${displaySettings.clinicNameFontSize || 1.35}rem`, fontWeight: '900', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={clinic.name}>
                         {clinic.name}
                       </span>
                     </div>
 
                     <span style={{
-                      fontSize: '0.75rem',
+                      fontSize: '0.8rem',
                       fontWeight: '800',
-                      padding: '4px 12px',
+                      padding: '3px 10px',
                       borderRadius: '12px',
                       background: waitingCount > 0 ? '#fef3c7' : isCallActive ? '#ecfdf5' : '#f1f5f9',
                       color: waitingCount > 0 ? '#b45309' : isCallActive ? '#15803d' : '#64748b',
-                      border: isCallActive ? '1px solid #bbf7d0' : 'none'
+                      border: isCallActive ? '1px solid #bbf7d0' : 'none',
+                      flexShrink: 0,
+                      marginLeft: '6px'
                     }}>
                       {waitingCount > 0 ? `${waitingCount} Menunggu` : lastCalledTicket ? 'Antrean Selesai' : 'Belum Ada Antrean'}
                     </span>
                   </div>
 
                   {/* Grid of Dipanggil vs Terakhir Ambil */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'center' }}>
                     {/* Left: Dipanggil */}
-                    <div style={{ background: isCallActive ? '#f0fdf4' : '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: isCallActive ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.7rem', color: isCallActive ? '#15803d' : '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ background: isCallActive ? '#f0fdf4' : '#f8fafc', padding: '6px 10px', borderRadius: '12px', border: isCallActive ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.75rem', color: isCallActive ? '#15803d' : '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         DIPANGGIL:
                       </div>
-                      <div style={{ fontSize: '1.75rem', fontWeight: '900', color: isCallActive ? '#15803d' : lastCalledTicket ? '#334155' : '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
+                      <div style={{ fontSize: `${displaySettings.queueNumberFontSize || 2.7}rem`, fontWeight: '900', color: isCallActive ? '#15803d' : lastCalledTicket ? '#1e293b' : '#cbd5e1', lineHeight: 1, marginTop: '3px', letterSpacing: '0.5px' }}>
                         {lastCalledTicket ? lastCalledTicket.ticketNumber : '-'}
                       </div>
                       {lastCalledTicket && (
-                        <div style={{ fontSize: '0.65rem', fontWeight: '700', color: isCallActive ? '#15803d' : '#64748b', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: '700', color: isCallActive ? '#15803d' : '#64748b', marginTop: '3px' }}>
                           {isCallActive ? '● Dipanggil/Melayani' : '● Selesai'}
                         </div>
                       )}
                     </div>
 
                     {/* Right: Terakhir Ambil */}
-                    <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         TERAKHIR AMBIL:
                       </div>
-                      <div style={{ fontSize: '1.75rem', fontWeight: '900', color: lastTakenTicket ? '#d97706' : '#cbd5e1', lineHeight: 1.1, marginTop: '2px' }}>
+                      <div style={{ fontSize: `${displaySettings.queueNumberFontSize || 2.7}rem`, fontWeight: '900', color: lastTakenTicket ? '#d97706' : '#cbd5e1', lineHeight: 1, marginTop: '3px', letterSpacing: '0.5px' }}>
                         {lastTakenTicket ? lastTakenTicket.ticketNumber : '-'}
                       </div>
                       {lastTakenTicket && (
-                        <div style={{ fontSize: '0.65rem', fontWeight: '700', color: '#d97706', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#d97706', marginTop: '3px' }}>
                           Total: {clinicTickets.length} Tiket
                         </div>
                       )}

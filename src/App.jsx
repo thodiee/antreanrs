@@ -79,7 +79,8 @@ export default function App() {
     tickets: [],
     history: []
   });
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(() => socket.connected);
+  const [dbStatus, setDbStatus] = useState('connected'); // 'connected', 'disconnected', 'checking'
   const [lastCall, setLastCall] = useState(null);
 
   const getAuthHeaders = (additional = {}) => {
@@ -93,6 +94,10 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Sync current connected status immediately
+    if (socket.connected) {
+      setConnected(true);
+    }
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
     if (viewParam && ['kiosk', 'tv', 'officer', 'admin'].includes(viewParam)) {
@@ -202,6 +207,70 @@ export default function App() {
       .then(resData => setData(resData))
       .catch(err => console.warn('Fetch initial state warning:', err));
 
+    const checkHealth = () => {
+      fetch('/api/health')
+        .then(res => {
+          if (!res.ok) throw new Error('API/Database error');
+          return res.json();
+        })
+        .then(resData => {
+          if (resData.success && resData.db === 'connected') {
+            setDbStatus('connected');
+          } else {
+            setDbStatus('disconnected');
+          }
+        })
+        .catch(() => {
+          setDbStatus('disconnected');
+        });
+    };
+
+    checkHealth();
+    const healthInterval = setInterval(checkHealth, 10000);
+
+    // Validasi token login saat web dibuka agar status login selalu update & sinkron dengan server
+    try {
+      const saved = localStorage.getItem('antrean_user');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed?.token) {
+        fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${parsed.token}` }
+        })
+          .then(res => {
+            if (res.status === 401 || res.status === 403) {
+              // Token sudah kadaluarsa atau tidak valid
+              console.warn('Sesi login telah kadaluarsa / tidak valid.');
+              localStorage.removeItem('antrean_user');
+              setCurrentUser(null);
+              updateSocketAuth(null);
+              return null;
+            }
+            return res.json();
+          })
+          .then(resData => {
+            if (resData?.success && resData?.user) {
+              // Perbarui data user dan role terbaru dari server
+              const updatedUser = { ...resData.user, token: parsed.token };
+              setCurrentUser(updatedUser);
+              localStorage.setItem('antrean_user', JSON.stringify(updatedUser));
+              updateSocketAuth(parsed.token);
+            }
+          })
+          .catch(() => {
+            // Jaringan offline sementara, biarkan sesi lokal namun tandai verifikasi tertunda
+          });
+      } else if (parsed && !parsed.token) {
+        // Objek user tersimpan tanpa token valid (legacy state tersangkut)
+        localStorage.removeItem('antrean_user');
+        setCurrentUser(null);
+        updateSocketAuth(null);
+      }
+    } catch {
+      localStorage.removeItem('antrean_user');
+      setCurrentUser(null);
+      updateSocketAuth(null);
+    }
+
     // Client-side date rollover detection (e.g. at 00:00 midnight)
     let lastDate = new Date().toLocaleDateString('en-CA');
     const midnightTimer = setInterval(() => {
@@ -219,6 +288,7 @@ export default function App() {
 
     return () => {
       clearInterval(midnightTimer);
+      clearInterval(healthInterval);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('state_sync', onStateSync);
@@ -389,9 +459,34 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div className="status-badge">
-                <span className="status-dot" style={{ background: connected ? '#10b981' : '#ef4444' }}></span>
-                <span>{connected ? 'WebSocket' : 'Offline'}</span>
+              <div
+                className="status-badge"
+                style={{
+                  background: dbStatus === 'disconnected' ? '#fef2f2' : connected ? '#ecfdf5' : '#fff7ed',
+                  borderColor: dbStatus === 'disconnected' ? '#fecaca' : connected ? '#bbf7d0' : '#fed7aa',
+                  color: dbStatus === 'disconnected' ? '#dc2626' : connected ? '#15803d' : '#c2410c'
+                }}
+                title={
+                  dbStatus === 'disconnected'
+                    ? 'Gangguan koneksi ke Database / Server API'
+                    : connected
+                    ? 'Server & Database Terhubung Aktif (Online)'
+                    : 'Menghubungkan ke server antrean...'
+                }
+              >
+                <span
+                  className="status-dot"
+                  style={{
+                    background: dbStatus === 'disconnected' ? '#ef4444' : connected ? '#10b981' : '#f97316'
+                  }}
+                ></span>
+                <span>
+                  {dbStatus === 'disconnected'
+                    ? 'API / DB Error'
+                    : connected
+                    ? 'Online'
+                    : 'Menghubungkan...'}
+                </span>
               </div>
             )}
           </div>
