@@ -91,6 +91,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',
         fontSize: printSettings.fontSize || 'medium',
+        copies: printSettings.copies ? Number(printSettings.copies) : 2,
         showDateTime: printSettings.showDateTime !== false,
         showQrCode: printSettings.showQrCode !== false,
         qrCodeImage: printSettings.qrCodeImage || null,

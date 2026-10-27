@@ -9,7 +9,24 @@
 # tanpa dialog/preview sama sekali!
 # ==============================================================
 
-param([string]$PrinterName = "")
+param(
+    [string]$PrinterName = "",
+    [int]$Copies = 2
+)
+
+# ==============================================================
+# KONFIGURASI PRINT BRIDGE
+# ==============================================================
+# Jumlah lembar cetak default (1 = 1 lembar, 2 = 2 rangkap/copy, dst.)
+$DEFAULT_COPIES = if ($Copies -gt 0) { $Copies } else { 2 }
+
+# Tampilkan label pembeda di atas struk jika mencetak lebih dari 1 copy:
+# $false = Cetakan kedua struk identik/persis sama (Standar Rumah Sakit)
+# $true  = Menambahkan tulisan kecil "*** LEMBAR 1 : PASIEN ***" & "*** LEMBAR 2 : PETUGAS ***"
+$SHOW_COPY_LABEL = $false
+
+# Jeda waktu (milidetik) antar lembar cetak agar spooler printer thermal & auto-cutter memotong rapi
+$DELAY_BETWEEN_COPIES_MS = 400
 
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
@@ -32,6 +49,7 @@ Write-Host "       PRINT BRIDGE ANTREAN RS - SILENT PRINTING          " -Foregro
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "Printer Tujuan : $PrinterName" -ForegroundColor Green
 Write-Host "Port Server    : http://localhost:18080/" -ForegroundColor Green
+Write-Host "Jumlah Copy    : $DEFAULT_COPIES Rangkap (Otomatis keluar $DEFAULT_COPIES lembar)" -ForegroundColor Magenta
 Write-Host "Status         : AKTIF & SIAP MENERIMA CETAK TIKET..." -ForegroundColor White
 Write-Host "Layout Format  : Full Thermal Graphics (Presisi Layout Asli)" -ForegroundColor Cyan
 Write-Host "----------------------------------------------------------" -ForegroundColor Gray
@@ -41,7 +59,9 @@ Write-Host ""
 function Print-ThermalTicket {
     param(
         [Parameter(Mandatory=$true)] $ticket,
-        [string] $targetPrinter
+        [string] $targetPrinter,
+        [int] $copyIndex = 1,
+        [int] $totalCopies = 1
     )
 
     try {
@@ -60,6 +80,7 @@ function Print-ThermalTicket {
 
         # Hitung perkiraan tinggi struk agar kertas tidak keluar berlebihan
         $estHeight = 150
+        if ($SHOW_COPY_LABEL -and $totalCopies -gt 1) { $estHeight += 20 }
         if (-not [string]::IsNullOrWhiteSpace($ticket.logoBase64)) { $estHeight += 60 }
         if (-not [string]::IsNullOrWhiteSpace($ticket.hospitalSubtitle)) { $estHeight += 18 }
         if ($ticket.showAddress -ne $false) {
@@ -86,12 +107,16 @@ function Print-ThermalTicket {
         # Simpan ke script scope agar dapat diakses di dalam event handler PrintPage
         $script:activeTicket = $ticket
         $script:ticketWidth = $pageWidth
+        $script:copyIndex = $copyIndex
+        $script:totalCopies = $totalCopies
 
         $printDoc.add_PrintPage({
             param($sender, [System.Drawing.Printing.PrintPageEventArgs]$e)
 
             $t = $script:activeTicket
             $w = $script:ticketWidth
+            $curCopy = $script:copyIndex
+            $totCopies = $script:totalCopies
             $g = $e.Graphics
 
             # Jika driver printer melaporkan lebar kertas thermal yang valid, gunakan
@@ -141,6 +166,16 @@ function Print-ThermalTicket {
             $fFooter = New-Object System.Drawing.Font($fontFamily, (7.0 * $fScale), [System.Drawing.FontStyle]::Regular)
 
             $y = 6
+
+            # Label Rangkap/Copy (jika diaktifkan)
+            if ($SHOW_COPY_LABEL -and $totCopies -gt 1) {
+                $copyBadgeText = if ($curCopy -eq 1) { "*** LEMBAR 1 : PASIEN ***" } else { "*** LEMBAR 2 : PETUGAS / POLI ***" }
+                $fBadge = New-Object System.Drawing.Font($fontFamily, (7.0 * $fScale), [System.Drawing.FontStyle]::Bold)
+                $badgeSize = $g.MeasureString($copyBadgeText, $fBadge, [int]$w, $sfCenter)
+                $g.DrawString($copyBadgeText, $fBadge, $brushBlack, (New-Object System.Drawing.RectangleF(0, $y, $w, $badgeSize.Height)), $sfCenter)
+                $y += $badgeSize.Height + 4
+                $fBadge.Dispose()
+            }
 
             # 1. Hospital Logo (jika ada Base64)
             if (-not [string]::IsNullOrWhiteSpace($t.logoBase64)) {
@@ -312,9 +347,13 @@ function Print-ThermalTicket {
 
         # Fallback teks rapi jika GDI gagal
         $div = "--------------------------------"
+        $copyHeader = ""
+        if ($SHOW_COPY_LABEL -and $totalCopies -gt 1) {
+            $copyHeader = if ($copyIndex -eq 1) { "*** LEMBAR 1 : PASIEN ***`n" } else { "*** LEMBAR 2 : PETUGAS / POLI ***`n" }
+        }
         $fallbackTxt = @"
 
-$($ticket.hospitalName)
+$copyHeader$($ticket.hospitalName)
 $($ticket.hospitalSubtitle)
 $div
 $($ticket.clinicName)
@@ -372,6 +411,7 @@ while ($listener.IsListening) {
             $statusObj = @{
                 status = "ok"
                 printer = $PrinterName
+                defaultCopies = $DEFAULT_COPIES
             }
             $jsonStr = $statusObj | ConvertTo-Json -Compress
             $buffer = [System.Text.Encoding]::UTF8.GetBytes($jsonStr)
@@ -389,13 +429,34 @@ while ($listener.IsListening) {
 
             $tktNum = $ticket.ticketNumber
             $poliName = $ticket.clinicName
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] MENCETAK TIKET: $tktNum -> $poliName" -ForegroundColor Yellow
+            
+            # Prioritas penentuan jumlah rangkap copy:
+            # 1. Dari payload request tiket ($ticket.copies)
+            # 2. Dari konfigurasi Print Bridge ($DEFAULT_COPIES)
+            $targetCopies = $DEFAULT_COPIES
+            if ($ticket.copies -and [int]$ticket.copies -gt 0) {
+                $targetCopies = [int]$ticket.copies
+            }
 
-            $printSuccess = Print-ThermalTicket -ticket $ticket -targetPrinter $PrinterName
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] MENCETAK TIKET: $tktNum -> $poliName (Target: $targetCopies Rangkap)" -ForegroundColor Yellow
 
-            Write-Host "   -> Sukses dicetak sesuai layout thermal!" -ForegroundColor Green
+            $allSuccess = $true
+            for ($c = 1; $c -le $targetCopies; $c++) {
+                if ($targetCopies -gt 1) {
+                    Write-Host "   -> Mencetak Rangkap ke-$c dari $targetCopies..." -ForegroundColor Cyan
+                }
+                $printSuccess = Print-ThermalTicket -ticket $ticket -targetPrinter $PrinterName -copyIndex $c -totalCopies $targetCopies
+                if (-not $printSuccess) { $allSuccess = $false }
 
-            $resultObj = @{ success = $true; ticket = $tktNum }
+                # Jeda sepersekian detik antar lembar agar antrean spooler printer thermal dan auto-cutter bekerja rapi
+                if ($c -lt $targetCopies) {
+                    Start-Sleep -Milliseconds $DELAY_BETWEEN_COPIES_MS
+                }
+            }
+
+            Write-Host "   -> Sukses! Semua ($targetCopies rangkap) tiket berhasil dicetak." -ForegroundColor Green
+
+            $resultObj = @{ success = $allSuccess; ticket = $tktNum; copies = $targetCopies }
             $resJson = $resultObj | ConvertTo-Json -Compress
             $resBuffer = [System.Text.Encoding]::UTF8.GetBytes($resJson)
             $response.ContentType = "application/json"

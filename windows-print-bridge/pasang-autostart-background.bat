@@ -2,7 +2,8 @@
 title PASANG AUTOSTART PRINT BRIDGE (BACKGROUND)
 cd /d "%~dp0"
 echo ========================================================
-echo   MEMASANG AUTOSTART PRINT BRIDGE DI LATAR BELAKANG
+echo   MEMASANG AUTOSTART PRINT BRIDGE (MODE COPY 2)
+echo   Mode: Otomatis keluar 2 lembar (Pasien & Petugas)
 echo ========================================================
 echo.
 

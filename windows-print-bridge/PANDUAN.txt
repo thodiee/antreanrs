@@ -1,29 +1,53 @@
 ================================================================
 PANDUAN PENGGUNAAN PRINT BRIDGE ANTREAN RS (WINDOWS)
+VERSI OTOMATIS RANGKAP 2 (COPY 2)
 ================================================================
 
 Folder ini berisi tool Print Bridge agar printer thermal USB di komputer
 Windows dapat mencetak tiket antrean secara OTOMATIS & LANGSUNG
-tanpa memunculkan dialog/preview cetak Chrome sama sekali.
+(Silent Printing tanpa memunculkan dialog/preview cetak Chrome sama sekali).
 
+FITUR KHUSUS VERSI COPY 2:
+- Setiap kali ada pasien mengambil antrean di Kiosk, printer thermal
+  akan LANGSUNG OTOMATIS MENCETAK 2 LEMBAR STRUK TIKET:
+  * Lembar 1: Untuk Pasien
+  * Lembar 2: Untuk Petugas / Berkas Rekam Medis Poliklinik
+- Setiap lembar dicetak sebagai job terpisah dengan jeda sepersekian detik,
+  sehingga PISAU PEMOTONG OTOMATIS (Auto-Cutter) pada printer thermal
+  bisa memotong di antara lembar 1 dan lembar 2 dengan rapi!
+
+================================================================
 CARA PENGGUNAAN:
+================================================================
 
-1. AGAR OTOMATIS JALAN DI BACKGROUND (DIREKOMENDASIKAN):
+1. AGAR OTOMATIS JALAN DI BACKGROUND SAAT WINDOWS MENYALA (DIREKOMENDASIKAN):
    - Klik kanan 'pasang-autostart-background.bat', pilih Run as Administrator / Buka.
-   - Script akan otomatis mendaftarkan Print Bridge ke Windows Startup.
-   - Setiap kali komputer Windows dinyalakan atau restart, Print Bridge
-     akan langsung AKTIF di latar belakang (background) tanpa jendela hitam!
+   - Script akan mendaftarkan Print Bridge ke Windows Startup secara otomatis.
+   - Setiap kali komputer Windows dinyalakan atau direstart, Print Bridge
+     akan langsung AKTIF di latar belakang (background) mencetak 2 rangkap.
 
-2. JIKA HANYA INGIN MENJALANKAN MANUAL DENGAN JENDELA TERLIHAT:
-   - Klik 2x 'jalankan-printer-bridge.bat'.
-   - Jendela hitam akan menampilkan log tiket yang dicetak.
+2. JIKA INGIN MENJALANKAN MANUAL DENGAN JENDELA TERLIHAT:
+   - Klik 2x 'jalankan-printer-bridge-copy2.bat' (atau 'jalankan-printer-bridge.bat').
+   - Jendela hitam akan menampilkan log tiket yang dicetak secara real-time.
 
-3. UNTUK MENGECEK STATUS APAKAH SEDANG BERJALAN:
+3. JIKA SUATU SAAT INGIN HANYA MENCETAK 1 LEMBAR (1 COPY):
+   - Klik 2x 'jalankan-printer-bridge-1copy.bat'.
+
+4. UNTUK MENGECEK STATUS APAKAH PRINT BRIDGE AKTIF:
    - Klik 2x 'cek-status.bat'.
 
-4. UNTUK MENGHENTIKAN PROSES BACKGROUND:
+5. UNTUK MENGHENTIKAN PROSES BACKGROUND:
    - Klik 2x 'hentikan-printer-bridge.bat'.
 
-5. UNTUK MENCABUT DARI STARTUP WINDOWS:
+6. UNTUK MENCABUT DARI STARTUP WINDOWS:
    - Klik 2x 'hapus-autostart.bat'.
+
+================================================================
+CARA MENGATUR PENGATURAN TAMBAHAN (OPSIONAL):
+================================================================
+Buka file 'print-bridge.ps1' dengan Notepad:
+- Baris '$DEFAULT_COPIES = 2'  -> Ubah angka jika ingin 1, 2, atau 3 lembar.
+- Baris '$SHOW_COPY_LABEL = $false' -> Ubah menjadi $true jika ingin
+  di atas struk tercetak teks penanda:
+  '*** LEMBAR 1 : PASIEN ***' dan '*** LEMBAR 2 : PETUGAS / POLI ***'
 ================================================================

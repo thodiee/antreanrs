@@ -406,6 +406,7 @@ async function getFullState(user = null) {
   const defaultPrintSettings = {
     paperWidth: '58mm',
     fontSize: 'medium',
+    copies: 2,
     showLogo: true,
     logoHeight: 60,
     headerSubtitle: 'Sistem Antrean Poliklinik Terpadu',

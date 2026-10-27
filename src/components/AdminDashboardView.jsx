@@ -59,6 +59,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   const [printSettings, setPrintSettings] = useState({
     paperWidth: hospital?.printSettings?.paperWidth || '58mm',
     fontSize: hospital?.printSettings?.fontSize || 'medium',
+    copies: hospital?.printSettings?.copies !== undefined ? Number(hospital.printSettings.copies) : 2,
     showLogo: hospital?.printSettings?.showLogo !== false,
     logoHeight: hospital?.printSettings?.logoHeight || 60,
     headerSubtitle: hospital?.printSettings?.headerSubtitle || 'Sistem Antrean Poliklinik Terpadu',
@@ -2150,6 +2151,54 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{f.desc}</div>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* 2b. Jumlah Lembar / Rangkap Cetak (Copies) */}
+                <div>
+                  <label style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1e293b', display: 'block', marginBottom: '8px' }}>
+                    Jumlah Lembar Cetak per Antrean (Copies)
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPrintSettings({ ...printSettings, copies: 1 })}
+                      style={{
+                        padding: '0.85rem 1rem',
+                        borderRadius: '12px',
+                        border: (Number(printSettings.copies) === 1) ? '2px solid #15803d' : '1px solid #cbd5e1',
+                        background: (Number(printSettings.copies) === 1) ? '#ecfdf5' : '#f8fafc',
+                        color: (Number(printSettings.copies) === 1) ? '#166534' : '#475569',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.95rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Printer size={15} /> 1 Lembar (Standar)
+                      </div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>Hanya 1 lembar struk untuk pasien</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrintSettings({ ...printSettings, copies: 2 })}
+                      style={{
+                        padding: '0.85rem 1rem',
+                        borderRadius: '12px',
+                        border: (!printSettings.copies || Number(printSettings.copies) === 2) ? '2px solid #15803d' : '1px solid #cbd5e1',
+                        background: (!printSettings.copies || Number(printSettings.copies) === 2) ? '#ecfdf5' : '#f8fafc',
+                        color: (!printSettings.copies || Number(printSettings.copies) === 2) ? '#166534' : '#475569',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.95rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Printer size={15} /> 2 Rangkap (Copy 2 - Pasien & Petugas)
+                      </div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>Otomatis keluar 2 struk: 1 Pasien & 1 Poli</div>
+                    </button>
                   </div>
                 </div>
 

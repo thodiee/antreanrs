@@ -54,6 +54,7 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',
         fontSize: printSettings.fontSize || 'medium',
+        copies: printSettings.copies ? Number(printSettings.copies) : 2,
         showDateTime: printSettings.showDateTime !== false,
         showQrCode: printSettings.showQrCode !== false,
         qrCodeImage: printSettings.qrCodeImage || null,
