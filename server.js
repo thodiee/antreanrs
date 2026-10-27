@@ -375,6 +375,13 @@ async function getFullState(user = null) {
   const [infoSlides] = await pool.query('SELECT id, tag, icon, title, subtitle, description, sort_order AS sortOrder FROM info_slides ORDER BY sort_order ASC');
   const [clinics] = await pool.query('SELECT id, name, prefix, quota, active, description, sort_order AS sortOrder, schedule_days AS scheduleDays FROM clinics ORDER BY sort_order ASC, name ASC');
   const [counters] = await pool.query('SELECT id, name, clinic_id AS clinicId FROM counters');
+  const [beds] = await pool.query(
+    `SELECT id, room_name AS roomName, bed_class AS bedClass, 
+            total, occupied, available, gender, 
+            sort_order AS sortOrder, updated_at AS updatedAt 
+     FROM beds 
+     ORDER BY sort_order ASC, room_name ASC`
+  ).catch(() => [[]]);
 
   const today = getLocalDateStr();
   const [tickets] = await pool.query(
@@ -519,6 +526,7 @@ async function getFullState(user = null) {
     counters,
     tickets: formattedTickets,
     history: formattedHistory,
+    beds: beds || [],
     lastResetDate: today
   };
 }
@@ -1037,6 +1045,127 @@ app.post('/api/settings', requireAuth(['ADMIN']), async (req, res) => {
   } catch (err) {
     console.error('REST API /api/settings error:', err);
     res.status(500).json({ success: false, error: 'Gagal merubah pengaturan.' });
+  }
+});
+
+// Helper for beds
+async function getAllBeds() {
+  const [beds] = await pool.query(
+    `SELECT id, room_name AS roomName, bed_class AS bedClass, 
+            total, occupied, available, gender, 
+            sort_order AS sortOrder, updated_at AS updatedAt 
+     FROM beds 
+     ORDER BY sort_order ASC, room_name ASC`
+  );
+  return beds;
+}
+
+// REST API Endpoints for Hospital Bed Management (Tempat Tidur)
+app.get('/api/beds', async (req, res) => {
+  try {
+    const beds = await getAllBeds();
+    res.json({ success: true, beds });
+  } catch (err) {
+    console.error('REST API /api/beds error:', err);
+    res.status(500).json({ success: false, error: 'Gagal mengambil data tempat tidur.' });
+  }
+});
+
+app.post('/api/beds', requireAuth(['ADMIN', 'PENDAFTARAN']), async (req, res) => {
+  try {
+    const { roomName, bedClass, total, occupied, available, gender = 'Semua', sortOrder = 0 } = req.body;
+    if (!roomName || !bedClass) {
+      return res.status(400).json({ success: false, error: 'Nama tempat tidur/ruangan dan kelas wajib diisi.' });
+    }
+
+    const id = `b_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const occ = Math.max(0, parseInt(occupied) || 0);
+    const avail = Math.max(0, parseInt(available) || 0);
+    const tot = total !== undefined ? Math.max(0, parseInt(total) || 0) : (occ + avail);
+
+    await pool.query(
+      `INSERT INTO beds (id, room_name, bed_class, total, occupied, available, gender, sort_order) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, roomName.trim(), bedClass.trim(), tot, occ, avail, gender, parseInt(sortOrder) || 0]
+    );
+
+    const beds = await getAllBeds();
+    io.emit('beds_updated', beds);
+    res.json({ success: true, bed: { id, roomName, bedClass, total: tot, occupied: occ, available: avail, gender, sortOrder } });
+  } catch (err) {
+    console.error('REST API POST /api/beds error:', err);
+    res.status(500).json({ success: false, error: 'Gagal menambahkan data tempat tidur.' });
+  }
+});
+
+app.put('/api/beds/:id', requireAuth(['ADMIN', 'PENDAFTARAN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { roomName, bedClass, total, occupied, available, gender = 'Semua', sortOrder = 0 } = req.body;
+    if (!roomName || !bedClass) {
+      return res.status(400).json({ success: false, error: 'Nama tempat tidur/ruangan dan kelas wajib diisi.' });
+    }
+
+    const occ = Math.max(0, parseInt(occupied) || 0);
+    const avail = Math.max(0, parseInt(available) || 0);
+    const tot = total !== undefined ? Math.max(0, parseInt(total) || 0) : (occ + avail);
+
+    await pool.query(
+      `UPDATE beds 
+       SET room_name = ?, bed_class = ?, total = ?, occupied = ?, available = ?, gender = ?, sort_order = ? 
+       WHERE id = ?`,
+      [roomName.trim(), bedClass.trim(), tot, occ, avail, gender, parseInt(sortOrder) || 0, id]
+    );
+
+    const beds = await getAllBeds();
+    io.emit('beds_updated', beds);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('REST API PUT /api/beds error:', err);
+    res.status(500).json({ success: false, error: 'Gagal memperbarui data tempat tidur.' });
+  }
+});
+
+app.put('/api/beds/:id/quick-update', requireAuth(['ADMIN', 'POLIKLINIK', 'OFFICER', 'PENDAFTARAN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { occupied, available, total } = req.body;
+
+    const [rows] = await pool.query('SELECT * FROM beds WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Data tempat tidur tidak ditemukan.' });
+    }
+
+    const current = rows[0];
+    const newOccupied = occupied !== undefined ? Math.max(0, parseInt(occupied)) : current.occupied;
+    const newAvailable = available !== undefined ? Math.max(0, parseInt(available)) : current.available;
+    const newTotal = total !== undefined ? Math.max(0, parseInt(total)) : (newOccupied + newAvailable);
+
+    await pool.query(
+      `UPDATE beds SET occupied = ?, available = ?, total = ? WHERE id = ?`,
+      [newOccupied, newAvailable, newTotal, id]
+    );
+
+    const beds = await getAllBeds();
+    io.emit('beds_updated', beds);
+    res.json({ success: true, bed: { ...current, occupied: newOccupied, available: newAvailable, total: newTotal } });
+  } catch (err) {
+    console.error('REST API quick update bed error:', err);
+    res.status(500).json({ success: false, error: 'Gagal mengupdate angka tempat tidur.' });
+  }
+});
+
+app.delete('/api/beds/:id', requireAuth(['ADMIN', 'PENDAFTARAN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM beds WHERE id = ?', [id]);
+
+    const beds = await getAllBeds();
+    io.emit('beds_updated', beds);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('REST API DELETE /api/beds error:', err);
+    res.status(500).json({ success: false, error: 'Gagal menghapus data tempat tidur.' });
   }
 });
 

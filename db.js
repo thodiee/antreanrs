@@ -118,6 +118,18 @@ export async function initDatabase() {
         archived_at DATETIME DEFAULT NULL,
         INDEX idx_date_clinic (date, clinic_id)
       );
+
+      CREATE TABLE IF NOT EXISTS beds (
+        id VARCHAR(50) PRIMARY KEY,
+        room_name VARCHAR(255) NOT NULL,
+        bed_class VARCHAR(100) NOT NULL,
+        total INT DEFAULT 0,
+        occupied INT DEFAULT 0,
+        available INT DEFAULT 0,
+        gender VARCHAR(50) DEFAULT 'Semua',
+        sort_order INT DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      );
     `;
 
     const statements = schemaSql
@@ -308,6 +320,29 @@ export async function initDatabase() {
         if (!u.pass) {
           console.warn(`[Security Alert] Akun '${u.username}' dibuat dengan password acak: ${rawPassword}. Harap catat dan segera ganti di menu Admin.`);
         }
+      }
+    }
+
+    // Seed default beds if table is empty
+    const [bedsCount] = await pool.query('SELECT COUNT(*) as cnt FROM beds');
+    if (bedsCount[0].cnt === 0) {
+      const defaultBeds = [
+        { id: 'b_vvip', room_name: 'Paviliun Wijayakusuma', bed_class: 'VVIP', total: 4, occupied: 2, available: 2, gender: 'Semua', sort_order: 1 },
+        { id: 'b_vip', room_name: 'Paviliun Cempaka', bed_class: 'VIP', total: 8, occupied: 6, available: 2, gender: 'Semua', sort_order: 2 },
+        { id: 'b_kls1', room_name: 'Ruang Melati (Lantai 2)', bed_class: 'Kelas 1', total: 14, occupied: 10, available: 4, gender: 'Semua', sort_order: 3 },
+        { id: 'b_kls2', room_name: 'Ruang Anggrek (Lantai 2)', bed_class: 'Kelas 2', total: 20, occupied: 15, available: 5, gender: 'Semua', sort_order: 4 },
+        { id: 'b_kls3_mwr', room_name: 'Ruang Mawar (Lantai 3)', bed_class: 'Kelas 3', total: 30, occupied: 24, available: 6, gender: 'Semua', sort_order: 5 },
+        { id: 'b_kls3_pria', room_name: 'Ruang Dahlia Pria (Lantai 3)', bed_class: 'Kelas 3', total: 16, occupied: 12, available: 4, gender: 'Pria', sort_order: 6 },
+        { id: 'b_kls3_wnt', room_name: 'Ruang Dahlia Wanita (Lantai 3)', bed_class: 'Kelas 3', total: 16, occupied: 13, available: 3, gender: 'Wanita', sort_order: 7 },
+        { id: 'b_icu', room_name: 'Intensive Care Unit (ICU)', bed_class: 'ICU', total: 8, occupied: 6, available: 2, gender: 'Semua', sort_order: 8 },
+        { id: 'b_nicu', room_name: 'Neonatal ICU (NICU / PICU)', bed_class: 'NICU/PICU', total: 6, occupied: 4, available: 2, gender: 'Semua', sort_order: 9 },
+        { id: 'b_isolasi', room_name: 'Ruang Isolasi Infeksius', bed_class: 'Isolasi', total: 6, occupied: 3, available: 3, gender: 'Semua', sort_order: 10 }
+      ];
+      for (const b of defaultBeds) {
+        await pool.query(
+          `INSERT INTO beds (id, room_name, bed_class, total, occupied, available, gender, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [b.id, b.room_name, b.bed_class, b.total, b.occupied, b.available, b.gender, b.sort_order]
+        );
       }
     }
 

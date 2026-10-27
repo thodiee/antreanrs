@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Maximize2, MoveHorizontal, X, ExternalLink, Volume2, Volume1, VolumeX, Building2, Zap, Lightbulb, Megaphone, QrCode, MapPin, Phone } from 'lucide-react';
+import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Maximize2, MoveHorizontal, X, ExternalLink, Volume2, Volume1, VolumeX, Building2, Zap, Lightbulb, Megaphone, QrCode, MapPin, Phone, BedDouble, Activity, CheckCircle2, Minus, Search, Filter } from 'lucide-react';
 import ThermalTicketModal from './ThermalTicketModal';
 import { parseVideoUrl } from '../utils/videoHelper';
 
 const DAYS_LIST = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
-export default function AdminDashboardView({ hospital, clinics = [], counters = [], tickets = [], history = [], onUpdateSettings, onResetShift, currentUser }) {
-  const [activeTab, setActiveTab] = useState('overview'); // overview, clinics, tv, print, users, reset
+export default function AdminDashboardView({ hospital, clinics = [], counters = [], tickets = [], history = [], beds: propBeds = [], onUpdateSettings, onResetShift, currentUser }) {
+  const [activeTab, setActiveTab] = useState('overview'); // overview, clinics, tv, print, users, beds, reset
   const [hospitalForm, setHospitalForm] = useState(hospital || {});
   const [hospitalLogo, setHospitalLogo] = useState(hospital?.logo || '');
   const [displaySettings, setDisplaySettings] = useState({
@@ -93,10 +93,10 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   const getAuthHeaders = (additional = {}) => {
     try {
       const saved = localStorage.getItem('antrean_user');
-      const token = saved ? JSON.parse(saved)?.token : null;
+      const token = saved ? JSON.parse(saved)?.token : (currentUser?.token || null);
       return token ? { ...additional, 'Authorization': `Bearer ${token}` } : additional;
     } catch {
-      return additional;
+      return (currentUser?.token) ? { ...additional, 'Authorization': `Bearer ${currentUser.token}` } : additional;
     }
   };
 
@@ -112,6 +112,189 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         setLoadingUsers(false);
         console.warn('Fetch users error:', err);
       });
+  };
+
+  // Bed Management State & Handlers
+  const [bedsList, setBedsList] = useState(propBeds || []);
+  const [bedModalOpen, setBedModalOpen] = useState(false);
+  const [editingBed, setEditingBed] = useState(null);
+  const [bedToDelete, setBedToDelete] = useState(null);
+  const [bedDeleting, setBedDeleting] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [userDeleting, setUserDeleting] = useState(false);
+  const [bedForm, setBedForm] = useState({
+    roomName: '',
+    bedClass: 'Kelas 1',
+    customClass: '',
+    total: 10,
+    occupied: 0,
+    available: 10,
+    gender: 'Semua',
+    sortOrder: 0
+  });
+  const [bedFilterClass, setBedFilterClass] = useState('ALL');
+  const [bedSearch, setBedSearch] = useState('');
+  const [bedSaving, setBedSaving] = useState(false);
+
+  useEffect(() => {
+    if (propBeds && propBeds.length > 0) {
+      setBedsList(propBeds);
+    }
+  }, [propBeds]);
+
+  const fetchBeds = () => {
+    fetch('/api/beds', { headers: getAuthHeaders() })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.beds) {
+          setBedsList(data.beds);
+        }
+      })
+      .catch(err => console.warn('Fetch beds warning:', err));
+  };
+
+  const handleOpenAddBed = () => {
+    setEditingBed(null);
+    setBedForm({
+      roomName: '',
+      bedClass: 'Kelas 1',
+      customClass: '',
+      total: 10,
+      occupied: 0,
+      available: 10,
+      gender: 'Semua',
+      sortOrder: (bedsList.length + 1)
+    });
+    setBedModalOpen(true);
+  };
+
+  const handleOpenEditBed = (bed) => {
+    setEditingBed(bed);
+    const standardClasses = ['VVIP', 'VIP', 'Kelas 1', 'Kelas 2', 'Kelas 3', 'ICU', 'NICU/PICU', 'Isolasi'];
+    const isCustom = !standardClasses.includes(bed.bedClass);
+    setBedForm({
+      roomName: bed.roomName || '',
+      bedClass: isCustom ? 'CUSTOM' : bed.bedClass,
+      customClass: isCustom ? bed.bedClass : '',
+      total: Number(bed.total) || 0,
+      occupied: Number(bed.occupied) || 0,
+      available: Number(bed.available) || 0,
+      gender: bed.gender || 'Semua',
+      sortOrder: Number(bed.sortOrder) || 0
+    });
+    setBedModalOpen(true);
+  };
+
+  const handleSaveBed = async (e) => {
+    e?.preventDefault();
+    const finalClass = bedForm.bedClass === 'CUSTOM' ? bedForm.customClass.trim() : bedForm.bedClass;
+    if (!bedForm.roomName.trim()) {
+      alert('Nama tempat tidur / ruangan wajib diisi.');
+      return;
+    }
+    if (!finalClass) {
+      alert('Kelas perawatan wajib diisi.');
+      return;
+    }
+
+    setBedSaving(true);
+
+    const occ = Math.max(0, parseInt(bedForm.occupied) || 0);
+    const avail = Math.max(0, parseInt(bedForm.available) || 0);
+    const tot = bedForm.total !== undefined ? Math.max(0, parseInt(bedForm.total) || 0) : (occ + avail);
+
+    const payload = {
+      roomName: bedForm.roomName.trim(),
+      bedClass: finalClass,
+      total: tot,
+      occupied: occ,
+      available: avail,
+      gender: bedForm.gender,
+      sortOrder: Number(bedForm.sortOrder) || 0
+    };
+
+    try {
+      const url = editingBed ? `/api/beds/${editingBed.id}` : '/api/beds';
+      const method = editingBed ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchBeds();
+        setBedModalOpen(false);
+      } else {
+        alert(data.error || 'Gagal menyimpan data tempat tidur.');
+      }
+    } catch (err) {
+      console.error('Save bed error:', err);
+      alert('Gagal menghubungi server.');
+    } finally {
+      setBedSaving(false);
+    }
+  };
+
+  const handleDeleteBed = (bed) => {
+    setBedToDelete(bed);
+  };
+
+  const handleConfirmDeleteBed = async () => {
+    if (!bedToDelete) return;
+    setBedDeleting(true);
+    try {
+      const res = await fetch(`/api/beds/${bedToDelete.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBedsList(prev => prev.filter(b => b.id !== bedToDelete.id));
+        showToast(`Data tempat tidur '${bedToDelete.roomName}' (${bedToDelete.bedClass}) berhasil dihapus.`);
+        setBedToDelete(null);
+        if (bedModalOpen && editingBed?.id === bedToDelete.id) {
+          setBedModalOpen(false);
+          setEditingBed(null);
+        }
+      } else {
+        showToast(data.error || 'Gagal menghapus data tempat tidur.', 'danger');
+      }
+    } catch (err) {
+      console.error('Delete bed error:', err);
+      showToast('Gagal menghubungi server untuk menghapus data.', 'danger');
+    } finally {
+      setBedDeleting(false);
+    }
+  };
+
+  const handleQuickUpdateBed = async (bed, changeOcc, changeAvail) => {
+    const curOcc = Number(bed.occupied) || 0;
+    const curAvail = Number(bed.available) || 0;
+    const curTot = Number(bed.total) || (curOcc + curAvail);
+
+    let newOcc = Math.max(0, curOcc + changeOcc);
+    let newAvail = Math.max(0, curAvail + changeAvail);
+    let newTot = curTot;
+
+    if (changeOcc !== 0 && changeAvail === 0) {
+      newAvail = Math.max(0, newTot - newOcc);
+    } else if (changeAvail !== 0 && changeOcc === 0) {
+      newOcc = Math.max(0, newTot - newAvail);
+    }
+
+    setBedsList(prev => prev.map(b => b.id === bed.id ? { ...b, occupied: newOcc, available: newAvail, total: newTot } : b));
+
+    try {
+      await fetch(`/api/beds/${bed.id}/quick-update`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ occupied: newOcc, available: newAvail, total: newTot })
+      });
+    } catch (err) {
+      console.warn('Quick update bed error:', err);
+      fetchBeds();
+    }
   };
 
   // Synchronize incoming props when loaded or updated asynchronously from backend
@@ -249,23 +432,30 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     }
   };
 
-  const handleDeleteUser = async (user) => {
-    if (!window.confirm(`Yakin ingin menghapus pengguna "${user.name}" (${user.username})?`)) return;
+  const handleDeleteUser = (user) => {
+    setUserToDelete(user);
+  };
 
+  const handleConfirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    setUserDeleting(true);
     try {
-      const res = await fetch(`/api/users/${user.id}`, { 
+      const res = await fetch(`/api/users/${userToDelete.id}`, { 
         method: 'DELETE',
         headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.success) {
-        showToast('Pengguna berhasil dihapus.');
+        showToast(`Pengguna "${userToDelete.name}" (${userToDelete.username}) berhasil dihapus.`);
+        setUserToDelete(null);
         fetchUsers();
       } else {
         showToast(data.error || 'Gagal menghapus pengguna.', 'danger');
       }
     } catch (err) {
       showToast('Gagal menghubungi server.', 'danger');
+    } finally {
+      setUserDeleting(false);
     }
   };
 
@@ -595,6 +785,13 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     setClinicList(clinicList.map(c => c.id === id ? { ...c, [field]: value } : c));
   };
 
+  const handleDeleteClinic = (id) => {
+    const target = clinicList.find(c => c.id === id);
+    if (!target) return;
+    setClinicList(clinicList.filter(c => c.id !== id));
+    showToast(`Poliklinik '${target.name}' dihapus. Tekan "Simpan Perubahan" untuk menyimpan ke database.`);
+  };
+
   const handleExportCSV = () => {
     window.open('/api/reports/export-csv', '_blank');
   };
@@ -690,6 +887,22 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
             }}
           >
             <Users size={16} /> Manajemen Pengguna
+          </button>
+          <button
+            className={`view-btn ${activeTab === 'beds' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('beds');
+              fetchBeds();
+            }}
+            style={{
+              fontWeight: '800',
+              borderRadius: '8px',
+              background: activeTab === 'beds' ? 'white' : '#ecfdf5',
+              color: activeTab === 'beds' ? '#166534' : '#15803d',
+              border: '1px solid #a7f3d0'
+            }}
+          >
+            <BedDouble size={16} /> Ketersediaan Kamar / TT
           </button>
           <button
             className={`view-btn ${activeTab === 'reset' ? 'active' : ''}`}
@@ -869,6 +1082,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                 <th>Jadwal Buka Operasional (Hari)</th>
                 <th>Kuota Pasien</th>
                 <th>Buka / Tutup</th>
+                <th style={{ textAlign: 'center' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -971,6 +1185,29 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '700', background: c.active ? '#fef2f2' : '#ecfdf5', color: c.active ? '#b91c1c' : '#047857' }}
                       >
                         {c.active ? 'Tutup' : 'Buka'}
+                      </button>
+                    </td>
+
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteClinic(c.id)}
+                        style={{
+                          background: '#fee2e2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '6px',
+                          padding: '5px 10px',
+                          cursor: 'pointer',
+                          color: '#dc2626',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.78rem',
+                          fontWeight: '700'
+                        }}
+                        title="Hapus Poliklinik"
+                      >
+                        <Trash2 size={13} /> Hapus
                       </button>
                     </td>
                   </tr>
@@ -3324,6 +3561,881 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         </div>
       )}
 
+      {/* TAB: KETERSEDIAAN TEMPAT TIDUR & RUANG RAWAT INAP */}
+      {activeTab === 'beds' && (() => {
+        const totalBedsCount = bedsList.reduce((acc, b) => acc + (Number(b.total) || 0), 0);
+        const totalOccCount = bedsList.reduce((acc, b) => acc + (Number(b.occupied) || 0), 0);
+        const totalAvailCount = bedsList.reduce((acc, b) => acc + (Number(b.available) || 0), 0);
+        const currentBor = totalBedsCount > 0 ? ((totalOccCount / totalBedsCount) * 100).toFixed(1) : 0;
+
+        const uniqueClasses = Array.from(new Set(bedsList.map(b => b.bedClass).filter(Boolean)));
+
+        const filteredBedsList = bedsList.filter(b => {
+          const matchClass = bedFilterClass === 'ALL' || (b.bedClass && b.bedClass.toLowerCase() === bedFilterClass.toLowerCase());
+          const matchSearch = !bedSearch || 
+            (b.roomName && b.roomName.toLowerCase().includes(bedSearch.toLowerCase())) ||
+            (b.bedClass && b.bedClass.toLowerCase().includes(bedSearch.toLowerCase()));
+          return matchClass && matchSearch;
+        });
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Header Action Banner */}
+            <div className="admin-card" style={{ border: '2px solid #86efac', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 style={{ color: '#15803d', display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
+                    <BedDouble size={26} color="#15803d" /> Manajemen Ketersediaan Tempat Tidur & Ruang Rawat Inap
+                  </h2>
+                  <p style={{ margin: 0, color: '#475569', fontSize: '0.88rem' }}>
+                    Atur nama ruangan/TT, kelas perawatan, jumlah terpakai, dan sisa kamar kosong. Data tersinkronisasi otomatis ke Layar Display Tempat Tidur.
+                  </p>
+                </div>
+
+                {/* Main Action Buttons */}
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => window.open('/?view=beds', '_blank')}
+                    className="btn-primary"
+                    style={{
+                      background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                      color: 'white',
+                      padding: '0.75rem 1.25rem',
+                      borderRadius: '10px',
+                      fontWeight: '800',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)',
+                      cursor: 'pointer'
+                    }}
+                    title="Buka tampilan layar informasi tempat tidur di tab baru"
+                  >
+                    <ExternalLink size={17} /> Buka Layar Display Tempat Tidur (Tab Baru)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddBed}
+                    className="btn-primary"
+                    style={{
+                      background: '#0d9488',
+                      color: 'white',
+                      padding: '0.75rem 1.2rem',
+                      borderRadius: '10px',
+                      fontWeight: '800',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={17} /> Tambah Kamar / TT
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI Summary Cards */}
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#0284c7' }}>
+                  <BedDouble size={26} />
+                </div>
+                <div className="stat-info">
+                  <div className="stat-label">Total Kapasitas TT</div>
+                  <div className="stat-value">{totalBedsCount} <span style={{ fontSize: '0.9rem', color: '#64748b' }}>Tempat Tidur</span></div>
+                  <div className="stat-sub">Dari {bedsList.length} ruang perawatan</div>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#ea580c' }}>
+                  <Activity size={26} />
+                </div>
+                <div className="stat-info">
+                  <div className="stat-label">Jumlah Terpakai</div>
+                  <div className="stat-value" style={{ color: '#c2410c' }}>{totalOccCount} <span style={{ fontSize: '0.9rem', color: '#9a3412' }}>Terisi</span></div>
+                  <div className="stat-sub">Pasien sedang dirawat</div>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#16a34a' }}>
+                  <CheckCircle2 size={26} />
+                </div>
+                <div className="stat-info">
+                  <div className="stat-label">Sisa / Tersedia</div>
+                  <div className="stat-value" style={{ color: '#15803d' }}>{totalAvailCount} <span style={{ fontSize: '0.9rem', color: '#166534' }}>Kosong</span></div>
+                  <div className="stat-sub">Siap menerima pasien baru</div>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#9333ea' }}>
+                  <Layers size={26} />
+                </div>
+                <div className="stat-info">
+                  <div className="stat-label">Tingkat Keterisian (BOR)</div>
+                  <div className="stat-value" style={{ color: currentBor > 85 ? '#dc2626' : currentBor > 70 ? '#d97706' : '#15803d' }}>
+                    {currentBor}%
+                  </div>
+                  <div className="stat-sub">Bed Occupancy Rate</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="admin-card" style={{ padding: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setBedFilterClass('ALL')}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: '700',
+                      border: bedFilterClass === 'ALL' ? '2px solid #15803d' : '1px solid #cbd5e1',
+                      background: bedFilterClass === 'ALL' ? '#ecfdf5' : '#f8fafc',
+                      color: bedFilterClass === 'ALL' ? '#15803d' : '#475569',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Semua Kelas ({bedsList.length})
+                  </button>
+
+                  {uniqueClasses.map(cls => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => setBedFilterClass(cls)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        fontSize: '0.82rem',
+                        fontWeight: '700',
+                        border: bedFilterClass === cls ? '2px solid #15803d' : '1px solid #cbd5e1',
+                        background: bedFilterClass === cls ? '#ecfdf5' : '#f8fafc',
+                        color: bedFilterClass === cls ? '#15803d' : '#475569',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {cls}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ position: 'relative', minWidth: '240px' }}>
+                  <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    placeholder="Cari ruang / nama TT..."
+                    value={bedSearch}
+                    onChange={(e) => setBedSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px 7px 32px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Bed List Table */}
+            <div className="admin-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#1e293b' }}>
+                  Daftar Ruang & Tempat Tidur ({filteredBedsList.length})
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  Gunakan tombol <strong>[-]</strong> dan <strong>[+]</strong> untuk penyesuaian cepat jumlah pasien
+                </span>
+              </div>
+
+              {filteredBedsList.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  <BedDouble size={40} color="#94a3b8" style={{ margin: '0 auto 8px auto' }} />
+                  <p>Tidak ada data kamar / tempat tidur yang sesuai filter.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table-custom">
+                    <thead>
+                      <tr>
+                        <th>Urutan</th>
+                        <th>Nama Ruangan / Tempat Tidur</th>
+                        <th>Kelas</th>
+                        <th>Kategori</th>
+                        <th>Total TT</th>
+                        <th>Jumlah Terpakai</th>
+                        <th>Sisa (Kosong)</th>
+                        <th>Status</th>
+                        <th style={{ textAlign: 'center' }}>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBedsList.map((bed, idx) => {
+                        const total = Number(bed.total) || 0;
+                        const occ = Number(bed.occupied) || 0;
+                        const avail = Number(bed.available) || 0;
+                        const isFull = avail <= 0;
+
+                        return (
+                          <tr key={bed.id}>
+                            <td style={{ fontWeight: '700', color: '#64748b', width: '50px' }}>
+                              #{bed.sortOrder || idx + 1}
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '0.95rem' }}>
+                                {bed.roomName}
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{
+                                padding: '3px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: '800',
+                                background: '#f1f5f9',
+                                border: '1px solid #cbd5e1',
+                                color: '#1e293b'
+                              }}>
+                                {bed.bedClass}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                color: bed.gender === 'Pria' ? '#2563eb' : bed.gender === 'Wanita' ? '#db2777' : '#475569'
+                              }}>
+                                {bed.gender || 'Semua'}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: '800', color: '#334155' }}>
+                              {total} TT
+                            </td>
+                            <td>
+                              {/* Quick Occ Counter */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickUpdateBed(bed, -1, 0)}
+                                  disabled={occ <= 0}
+                                  style={{
+                                    width: '26px',
+                                    height: '26px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#f8fafc',
+                                    cursor: occ <= 0 ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#64748b'
+                                  }}
+                                  title="Kurangi 1 Pasien Terpakai"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <span style={{
+                                  fontWeight: '900',
+                                  fontSize: '1rem',
+                                  color: '#c2410c',
+                                  minWidth: '28px',
+                                  textAlign: 'center',
+                                  background: '#fff7ed',
+                                  padding: '2px 6px',
+                                  borderRadius: '6px'
+                                }}>
+                                  {occ}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickUpdateBed(bed, 1, 0)}
+                                  style={{
+                                    width: '26px',
+                                    height: '26px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#f8fafc',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#64748b'
+                                  }}
+                                  title="Tambah 1 Pasien Terpakai"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </td>
+                            <td>
+                              {/* Quick Avail Counter */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickUpdateBed(bed, 0, -1)}
+                                  disabled={avail <= 0}
+                                  style={{
+                                    width: '26px',
+                                    height: '26px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#f8fafc',
+                                    cursor: avail <= 0 ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#64748b'
+                                  }}
+                                  title="Kurangi 1 Kamar Kosong"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <span style={{
+                                  fontWeight: '900',
+                                  fontSize: '1rem',
+                                  color: isFull ? '#dc2626' : '#15803d',
+                                  minWidth: '28px',
+                                  textAlign: 'center',
+                                  background: isFull ? '#fef2f2' : '#ecfdf5',
+                                  padding: '2px 6px',
+                                  borderRadius: '6px'
+                                }}>
+                                  {avail}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickUpdateBed(bed, 0, 1)}
+                                  style={{
+                                    width: '26px',
+                                    height: '26px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#f8fafc',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#64748b'
+                                  }}
+                                  title="Tambah 1 Kamar Kosong"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </td>
+                            <td>
+                              {isFull ? (
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '20px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '800',
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <AlertTriangle size={12} /> PENUH
+                                </span>
+                              ) : (
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '20px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '800',
+                                  background: '#ecfdf5',
+                                  color: '#15803d',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <CheckCircle2 size={12} /> TERSEDIA {avail}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditBed(bed)}
+                                  style={{
+                                    background: '#f1f5f9',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '6px',
+                                    padding: '5px 8px',
+                                    cursor: 'pointer',
+                                    color: '#0f172a'
+                                  }}
+                                  title="Edit Kamar & Angka TT"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteBed(bed)}
+                                  style={{
+                                    background: '#fee2e2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '6px',
+                                    padding: '5px 8px',
+                                    cursor: 'pointer',
+                                    color: '#dc2626'
+                                  }}
+                                  title="Hapus Data Kamar"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Tambah / Edit Kamar / TT */}
+            {bedModalOpen && (
+              <div 
+                className="modal-overlay" 
+                style={{ 
+                  zIndex: 2500,
+                  backdropFilter: 'blur(8px)',
+                  background: 'rgba(15, 23, 42, 0.72)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem'
+                }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setBedModalOpen(false);
+                }}
+              >
+                <div 
+                  className="modal-content" 
+                  style={{ 
+                    maxWidth: '560px',
+                    width: '100%',
+                    background: '#ffffff',
+                    borderRadius: '20px',
+                    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.06)',
+                    padding: '1.75rem 2rem',
+                    border: '1px solid #e2e8f0',
+                    boxSizing: 'border-box'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '12px',
+                        background: '#ecfdf5',
+                        border: '1.5px solid #a7f3d0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#059669',
+                        boxShadow: '0 2px 6px rgba(5, 150, 105, 0.12)',
+                        flexShrink: 0
+                      }}>
+                        <BedDouble size={26} />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>
+                          {editingBed ? 'Edit Data Kamar / Tempat Tidur' : 'Tambah Kamar / Tempat Tidur Baru'}
+                        </h3>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                          Kelola kapasitas tempat tidur dan status keterisian rawat inap
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBedModalOpen(false)}
+                      title="Tutup Modal"
+                      style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        cursor: 'pointer',
+                        color: '#64748b',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s',
+                        flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#64748b'; }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveBed}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {/* Nama Ruangan */}
+                      <div>
+                        <label style={{ fontSize: '0.84rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                          Nama Ruangan / Bangsal / Tempat Tidur <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={bedForm.roomName}
+                          onChange={(e) => setBedForm({ ...bedForm, roomName: e.target.value })}
+                          placeholder="Contoh: Ruang Melati 01, Paviliun Cempaka, ICU"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 0.9rem',
+                            borderRadius: '10px',
+                            border: '1.5px solid #cbd5e1',
+                            fontSize: '0.92rem',
+                            color: '#0f172a',
+                            background: '#f8fafc',
+                            outline: 'none',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+
+                      {/* Kelas Perawatan & Kategori Gender */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.84rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                            Kelas Perawatan <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
+                          <select
+                            value={bedForm.bedClass}
+                            onChange={(e) => setBedForm({ ...bedForm, bedClass: e.target.value })}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 0.9rem',
+                              borderRadius: '10px',
+                              border: '1.5px solid #cbd5e1',
+                              fontSize: '0.92rem',
+                              color: '#0f172a',
+                              background: '#f8fafc',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            <option value="VVIP">VVIP</option>
+                            <option value="VIP">VIP</option>
+                            <option value="Kelas 1">Kelas 1</option>
+                            <option value="Kelas 2">Kelas 2</option>
+                            <option value="Kelas 3">Kelas 3</option>
+                            <option value="ICU">ICU (Intensive Care)</option>
+                            <option value="NICU/PICU">NICU / PICU</option>
+                            <option value="Isolasi">Isolasi</option>
+                            <option value="CUSTOM">+ Lainnya (Ketik Manual)...</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '0.84rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                            Kategori Gender / Pasien
+                          </label>
+                          <select
+                            value={bedForm.gender}
+                            onChange={(e) => setBedForm({ ...bedForm, gender: e.target.value })}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 0.9rem',
+                              borderRadius: '10px',
+                              border: '1.5px solid #cbd5e1',
+                              fontSize: '0.92rem',
+                              color: '#0f172a',
+                              background: '#f8fafc',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            <option value="Semua">Semua / Campur</option>
+                            <option value="Pria">Khusus Pria</option>
+                            <option value="Wanita">Khusus Wanita</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Custom Class Input if CUSTOM selected */}
+                      {bedForm.bedClass === 'CUSTOM' && (
+                        <div>
+                          <label style={{ fontSize: '0.84rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                            Ketik Nama Kelas Kustom <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={bedForm.customClass}
+                            onChange={(e) => setBedForm({ ...bedForm, customClass: e.target.value })}
+                            placeholder="Contoh: HCU, Perinatologi, Ruang Bersalin"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 0.9rem',
+                              borderRadius: '10px',
+                              border: '1.5px solid #cbd5e1',
+                              fontSize: '0.92rem',
+                              color: '#0f172a',
+                              background: '#f8fafc',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Kalkulasi Jumlah Tempat Tidur */}
+                      <div style={{
+                        background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                        padding: '1.1rem',
+                        borderRadius: '14px',
+                        border: '1.5px solid #e2e8f0',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Activity size={15} color="#15803d" />
+                            Kalkulasi Kapasitas Tempat Tidur
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
+                            Otomatis Dihitung
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                          {/* Terpakai */}
+                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1.5px solid #fed7aa', boxShadow: '0 1px 3px rgba(234, 88, 12, 0.08)' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: '800', color: '#c2410c', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                              Terpakai
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={bedForm.occupied}
+                              onChange={(e) => {
+                                const occ = Math.max(0, parseInt(e.target.value) || 0);
+                                const tot = Math.max(occ, parseInt(bedForm.total) || (occ + bedForm.available));
+                                const avail = Math.max(0, tot - occ);
+                                setBedForm({ ...bedForm, occupied: occ, available: avail, total: tot });
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid #fdba74',
+                                fontSize: '1.15rem',
+                                fontWeight: '800',
+                                color: '#c2410c',
+                                background: '#fff7ed',
+                                textAlign: 'center',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <div style={{ fontSize: '0.68rem', color: '#9a3412', textAlign: 'center', marginTop: '4px' }}>Pasien Rawat</div>
+                          </div>
+
+                          {/* Sisa (Tersedia) */}
+                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1.5px solid #bbf7d0', boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: '800', color: '#15803d', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                              Sisa Kosong
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={bedForm.available}
+                              onChange={(e) => {
+                                const avail = Math.max(0, parseInt(e.target.value) || 0);
+                                const occ = Math.max(0, parseInt(bedForm.occupied) || 0);
+                                setBedForm({ ...bedForm, available: avail, total: (occ + avail) });
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid #86efac',
+                                fontSize: '1.15rem',
+                                fontWeight: '800',
+                                color: '#15803d',
+                                background: '#f0fdf4',
+                                textAlign: 'center',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <div style={{ fontSize: '0.68rem', color: '#166534', textAlign: 'center', marginTop: '4px' }}>Siap Pakai</div>
+                          </div>
+
+                          {/* Total Kapasitas */}
+                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1.5px solid #bae6fd', boxShadow: '0 1px 3px rgba(3, 105, 161, 0.08)' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: '800', color: '#0369a1', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                              Total Kapasitas
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={bedForm.total}
+                              onChange={(e) => {
+                                const tot = Math.max(0, parseInt(e.target.value) || 0);
+                                const occ = Math.min(tot, Math.max(0, parseInt(bedForm.occupied) || 0));
+                                const avail = Math.max(0, tot - occ);
+                                setBedForm({ ...bedForm, total: tot, occupied: occ, available: avail });
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid #7dd3fc',
+                                fontSize: '1.15rem',
+                                fontWeight: '800',
+                                color: '#0369a1',
+                                background: '#f0f9ff',
+                                textAlign: 'center',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <div style={{ fontSize: '0.68rem', color: '#075985', textAlign: 'center', marginTop: '4px' }}>Total Ranjang</div>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '8px', textAlign: 'center' }}>
+                          💡 <em>Total Kapasitas = Jumlah Terpakai + Sisa Kosong</em>
+                        </div>
+                      </div>
+
+                      {/* Urutan */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                        <div>
+                          <label style={{ fontSize: '0.84rem', fontWeight: '700', color: '#334155', display: 'block' }}>
+                            Urutan Tampilan di Layar
+                          </label>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            Nomor urut tampil di TV Display / Kiosk
+                          </span>
+                        </div>
+                        <input
+                          type="number"
+                          value={bedForm.sortOrder}
+                          onChange={(e) => setBedForm({ ...bedForm, sortOrder: parseInt(e.target.value) || 0 })}
+                          style={{
+                            width: '80px',
+                            padding: '0.5rem 0.6rem',
+                            borderRadius: '8px',
+                            border: '1.5px solid #cbd5e1',
+                            fontSize: '0.92rem',
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            background: '#ffffff',
+                            color: '#0f172a'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid #f1f5f9' }}>
+                      {editingBed && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBedToDelete(editingBed);
+                          }}
+                          style={{
+                            padding: '0.75rem 1.2rem',
+                            background: '#fee2e2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '10px',
+                            fontWeight: '700',
+                            fontSize: '0.88rem',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            marginRight: 'auto'
+                          }}
+                        >
+                          <Trash2 size={15} /> Hapus Kamar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setBedModalOpen(false)}
+                        style={{
+                          padding: '0.75rem 1.4rem',
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '10px',
+                          fontWeight: '700',
+                          fontSize: '0.9rem',
+                          color: '#475569',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={bedSaving}
+                        style={{
+                          padding: '0.75rem 1.6rem',
+                          background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                          border: 'none',
+                          borderRadius: '10px',
+                          fontWeight: '800',
+                          fontSize: '0.9rem',
+                          color: '#ffffff',
+                          cursor: bedSaving ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        {bedSaving ? (
+                          <>
+                            <RefreshCw size={16} className="animate-spin" />
+                            <span>Menyimpan...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={18} />
+                            <span>{editingBed ? 'Simpan Perubahan' : 'Tambahkan Kamar'}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* TAB 6: SHIFT RESET */}
       {activeTab === 'reset' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -3450,6 +4562,97 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
               >
                 <RefreshCw size={18} className={isResettingShift ? 'animate-spin' : ''} />
                 {isResettingShift ? 'Memproses Reset...' : 'Ya, Reset Shift Sekarang (001)'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Kamar / Tempat Tidur */}
+      {bedToDelete && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-content" style={{ maxWidth: '480px', border: '2px solid #ef4444' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem', color: '#b91c1c' }}>
+              <div style={{ background: '#fee2e2', padding: '10px', borderRadius: '50%', display: 'flex' }}>
+                <Trash2 size={28} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800' }}>Konfirmasi Hapus Kamar</h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>Hapus data tempat tidur & ruang rawat inap</p>
+              </div>
+            </div>
+
+            <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '10px', padding: '1rem', marginBottom: '1.5rem', fontSize: '0.92rem', color: '#7f1d1d', lineHeight: '1.6' }}>
+              <p style={{ margin: '0 0 0.5rem 0' }}>
+                Yakin ingin menghapus data tempat tidur <strong>'{bedToDelete.roomName}'</strong> ({bedToDelete.bedClass})?
+              </p>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#991b1b' }}>
+                Ruangan ini tidak akan lagi ditampilkan pada Layar Display Ketersediaan Kamar Rumah Sakit.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setBedToDelete(null)}
+                disabled={bedDeleting}
+                style={{ padding: '0.75rem 1.4rem', fontWeight: '600' }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={handleConfirmDeleteBed}
+                disabled={bedDeleting}
+                style={{ padding: '0.75rem 1.4rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Trash2 size={16} />
+                {bedDeleting ? 'Menghapus...' : 'Ya, Hapus Data Kamar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Pengguna */}
+      {userToDelete && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-content" style={{ maxWidth: '480px', border: '2px solid #ef4444' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem', color: '#b91c1c' }}>
+              <div style={{ background: '#fee2e2', padding: '10px', borderRadius: '50%', display: 'flex' }}>
+                <Trash2 size={28} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800' }}>Konfirmasi Hapus Pengguna</h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>Hapus akun akses petugas / admin</p>
+              </div>
+            </div>
+
+            <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '10px', padding: '1rem', marginBottom: '1.5rem', fontSize: '0.92rem', color: '#7f1d1d', lineHeight: '1.6' }}>
+              Apakah Anda yakin ingin menghapus pengguna <strong>"{userToDelete.name}"</strong> (Username: <code>{userToDelete.username}</code>)?
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setUserToDelete(null)}
+                disabled={userDeleting}
+                style={{ padding: '0.75rem 1.4rem', fontWeight: '600' }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={handleConfirmDeleteUser}
+                disabled={userDeleting}
+                style={{ padding: '0.75rem 1.4rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Trash2 size={16} />
+                {userDeleting ? 'Menghapus...' : 'Ya, Hapus Pengguna'}
               </button>
             </div>
           </div>

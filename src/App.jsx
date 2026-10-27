@@ -5,6 +5,7 @@ import KioskView from './components/KioskView';
 import TvDisplayView from './components/TvDisplayView';
 import OfficerConsoleView from './components/OfficerConsoleView';
 import AdminDashboardView from './components/AdminDashboardView';
+import BedDisplayView from './components/BedDisplayView';
 import LoginForm from './components/LoginForm';
 
 import { Ticket, Tv, UserCheck, LayoutDashboard, ExternalLink, LogOut, ShieldCheck, User } from 'lucide-react';
@@ -77,7 +78,8 @@ export default function App() {
     clinics: [],
     counters: [],
     tickets: [],
-    history: []
+    history: [],
+    beds: []
   });
   const [connected, setConnected] = useState(() => socket.connected);
   const [dbStatus, setDbStatus] = useState('connected'); // 'connected', 'disconnected', 'checking'
@@ -100,8 +102,8 @@ export default function App() {
     }
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
-    if (viewParam && ['kiosk', 'tv', 'officer', 'admin'].includes(viewParam)) {
-      setCurrentView(viewParam);
+    if (viewParam && ['kiosk', 'tv', 'officer', 'admin', 'beds', 'bed', 'tempat-tidur'].includes(viewParam)) {
+      setCurrentView(viewParam === 'bed' || viewParam === 'tempat-tidur' ? 'beds' : viewParam);
     }
 
     function onConnect() {
@@ -189,6 +191,12 @@ export default function App() {
       });
     }
 
+    function onBedsUpdated(updatedBeds) {
+      if (Array.isArray(updatedBeds)) {
+        setData(prev => ({ ...prev, beds: updatedBeds }));
+      }
+    }
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('state_sync', onStateSync);
@@ -201,6 +209,7 @@ export default function App() {
     socket.on('shift_reset', onShiftReset);
     socket.on('day_changed', onDayChanged);
     socket.on('video_ready', onVideoReady);
+    socket.on('beds_updated', onBedsUpdated);
 
     fetch('/api/initial-state', { headers: getAuthHeaders() })
       .then(res => res.json())
@@ -301,6 +310,7 @@ export default function App() {
       socket.off('shift_reset', onShiftReset);
       socket.off('day_changed', onDayChanged);
       socket.off('video_ready', onVideoReady);
+      socket.off('beds_updated', onBedsUpdated);
     };
   }, []);
 
@@ -409,6 +419,21 @@ export default function App() {
     currentUser.role === 'ADMIN'
   );
   const isAdminAuthorized = currentUser && currentUser.role === 'ADMIN';
+
+  if (currentView === 'beds') {
+    return (
+      <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#f8fafc', padding: 0, margin: 0 }}>
+        <BedDisplayView
+          hospital={data.hospital}
+          beds={data.beds || []}
+          onBackToKiosk={() => {
+            setCurrentView('kiosk');
+            window.history.pushState({}, '', '/?view=kiosk');
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -582,6 +607,7 @@ export default function App() {
                 counters={data.counters}
                 tickets={data.tickets}
                 history={data.history}
+                beds={data.beds || []}
                 onUpdateSettings={handleUpdateSettings}
                 onResetShift={handleResetShift}
                 currentUser={currentUser}
