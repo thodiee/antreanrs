@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Maximize2, MoveHorizontal, X, ExternalLink, Volume2, Volume1, VolumeX, Building2, Zap, Lightbulb, Megaphone, QrCode, MapPin, Phone, BedDouble, Activity, CheckCircle2, Minus, Search, Filter } from 'lucide-react';
+import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Tv, Maximize2, MoveHorizontal, X, ExternalLink, Volume2, Volume1, VolumeX, Building2, Zap, Lightbulb, Megaphone, QrCode, MapPin, Phone, BedDouble, Activity, CheckCircle2, Minus, Search, Filter } from 'lucide-react';
 import ThermalTicketModal from './ThermalTicketModal';
 import { parseVideoUrl } from '../utils/videoHelper';
 
@@ -65,7 +65,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   const [printSettings, setPrintSettings] = useState({
     paperWidth: hospital?.printSettings?.paperWidth || '58mm',
     fontSize: hospital?.printSettings?.fontSize || 'medium',
-    copies: hospital?.printSettings?.copies !== undefined ? Number(hospital.printSettings.copies) : 2,
+    copies: hospital?.printSettings?.copies === 'device' ? 'device' : (hospital?.printSettings?.copies !== undefined ? Number(hospital.printSettings.copies) : 'device'),
     showLogo: hospital?.printSettings?.showLogo !== false,
     logoHeight: hospital?.printSettings?.logoHeight || 60,
     headerSubtitle: hospital?.printSettings?.headerSubtitle || 'Sistem Antrean Poliklinik Terpadu',
@@ -351,6 +351,8 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
       password: '',
       name: '',
       role: 'POLIKLINIK',
+      allowedPages: ['kiosk', 'officer'],
+      assignedKioskClinicIds: [],
       assignedClinicIds: []
     });
     setUserModalOpen(true);
@@ -361,11 +363,24 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     const clinicIds = Array.isArray(user.assignedClinicIds) && user.assignedClinicIds.length > 0
       ? user.assignedClinicIds
       : (user.assignedClinicId ? user.assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    const kioskClinicIds = Array.isArray(user.assignedKioskClinicIds) && user.assignedKioskClinicIds.length > 0
+      ? user.assignedKioskClinicIds
+      : (user.assigned_kiosk_clinic_ids ? user.assigned_kiosk_clinic_ids.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    const pages = Array.isArray(user.allowedPages) && user.allowedPages.length > 0
+      ? user.allowedPages
+      : (user.allowed_pages ? user.allowed_pages.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : (
+        user.role === 'ADMIN' ? ['kiosk', 'officer', 'tv', 'admin'] : (user.role === 'PENDAFTARAN' ? ['kiosk'] : ['officer'])
+      ));
+
     setUserForm({
       username: user.username,
       password: '',
       name: user.name,
-      role: user.role,
+      role: user.role || 'POLIKLINIK',
+      allowedPages: pages,
+      assignedKioskClinicIds: kioskClinicIds,
       assignedClinicIds: clinicIds
     });
     setUserModalOpen(true);
@@ -373,10 +388,23 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
   const handleSaveUser = async (e) => {
     e.preventDefault();
-    if (!userForm.name || !userForm.role) return;
+    if (!userForm.name) return;
+    if (!userForm.allowedPages || userForm.allowedPages.length === 0) {
+      showToast('Pilih minimal 1 hak akses halaman untuk akun ini.', 'danger');
+      return;
+    }
 
     try {
       const clinicIdStr = userForm.assignedClinicIds.length > 0 ? userForm.assignedClinicIds.join(',') : null;
+      let computedRole = userForm.role || 'POLIKLINIK';
+      if (userForm.allowedPages.includes('admin')) {
+        computedRole = 'ADMIN';
+      } else if (userForm.allowedPages.includes('officer')) {
+        computedRole = 'POLIKLINIK';
+      } else if (userForm.allowedPages.includes('kiosk')) {
+        computedRole = 'PENDAFTARAN';
+      }
+
       if (editingUser) {
         // Edit existing
         if (userForm.password && userForm.password.trim().length < 6) {
@@ -388,15 +416,17 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             name: userForm.name,
-            role: userForm.role,
-            assignedClinicId: clinicIdStr,
+            role: computedRole,
+            allowedPages: userForm.allowedPages,
+            assignedKioskClinicIds: userForm.assignedKioskClinicIds,
             assignedClinicIds: userForm.assignedClinicIds,
+            assignedClinicId: clinicIdStr,
             password: userForm.password ? userForm.password : undefined
           })
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Data pengguna berhasil diperbarui!');
+          showToast('Data pengguna & hak akses berhasil diperbarui!');
           setUserModalOpen(false);
           fetchUsers();
         } else {
@@ -419,14 +449,16 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
             username: userForm.username,
             password: userForm.password,
             name: userForm.name,
-            role: userForm.role,
-            assignedClinicId: clinicIdStr,
-            assignedClinicIds: userForm.assignedClinicIds
+            role: computedRole,
+            allowedPages: userForm.allowedPages,
+            assignedKioskClinicIds: userForm.assignedKioskClinicIds,
+            assignedClinicIds: userForm.assignedClinicIds,
+            assignedClinicId: clinicIdStr
           })
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Pengguna baru berhasil ditambahkan!');
+          showToast('Pengguna baru & hak akses berhasil ditambahkan!');
           setUserModalOpen(false);
           fetchUsers();
         } else {
@@ -2567,51 +2599,55 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                   </div>
                 </div>
 
-                {/* 2b. Jumlah Lembar / Rangkap Cetak (Copies) */}
-                <div>
-                  <label style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1e293b', display: 'block', marginBottom: '8px' }}>
-                    Jumlah Lembar Cetak per Antrean (Copies)
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setPrintSettings({ ...printSettings, copies: 1 })}
-                      style={{
-                        padding: '0.85rem 1rem',
-                        borderRadius: '12px',
-                        border: (Number(printSettings.copies) === 1) ? '2px solid #15803d' : '1px solid #cbd5e1',
-                        background: (Number(printSettings.copies) === 1) ? '#ecfdf5' : '#f8fafc',
-                        color: (Number(printSettings.copies) === 1) ? '#166534' : '#475569',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div style={{ fontSize: '0.95rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Printer size={15} /> 1 Lembar (Standar)
-                      </div>
-                      <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>Hanya 1 lembar struk untuk pasien</div>
-                    </button>
+                {/* 2b. Mode Cetak Multi-Komputer (Bebas per Komputer) */}
+                <div style={{
+                  background: '#f8fafc',
+                  padding: '1.1rem 1.25rem',
+                  borderRadius: '14px',
+                  border: '1.5px solid #86efac',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.05)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Monitor size={18} style={{ color: '#16a34a' }} />
+                      <label style={{ fontSize: '0.95rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>
+                        Mode Cetak: Bebas per Komputer (Multi-Komputer)
+                      </label>
+                    </div>
+                    <span style={{ fontSize: '0.78rem', color: '#047857', background: '#ecfdf5', padding: '3px 10px', borderRadius: '20px', fontWeight: '800', border: '1px solid #a7f3d0' }}>
+                      ✓ Aktif Otomatis
+                    </span>
+                  </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setPrintSettings({ ...printSettings, copies: 2 })}
-                      style={{
-                        padding: '0.85rem 1rem',
-                        borderRadius: '12px',
-                        border: (!printSettings.copies || Number(printSettings.copies) === 2) ? '2px solid #15803d' : '1px solid #cbd5e1',
-                        background: (!printSettings.copies || Number(printSettings.copies) === 2) ? '#ecfdf5' : '#f8fafc',
-                        color: (!printSettings.copies || Number(printSettings.copies) === 2) ? '#166534' : '#475569',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div style={{ fontSize: '0.95rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Printer size={15} /> 2 Rangkap (Copy 2 - Pasien & Petugas)
+                  <p style={{ fontSize: '0.82rem', color: '#475569', margin: '0 0 12px 0', lineHeight: 1.45 }}>
+                    Sistem sudah diatur dalam mode <strong>Multi-Komputer</strong>. Pusat tidak membatasi lembar cetak, sehingga <strong>Komputer A bisa mencetak 1 lembar</strong> dan <strong>Komputer B bisa mencetak 2 rangkap</strong> secara mandiri.
+                  </p>
+
+                  {/* Panduan Setting Komputer A & B */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px' }}>
+                    {/* Komputer A: 1 Lembar */}
+                    <div style={{ background: '#ffffff', padding: '12px 14px', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', color: '#1d4ed8', fontSize: '0.88rem', marginBottom: '6px' }}>
+                        <Printer size={15} /> Komputer A (Cetak 1 Lembar):
                       </div>
-                      <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>Otomatis keluar 2 struk: 1 Pasien & 1 Poli</div>
-                    </button>
+                      <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '0.77rem', color: '#334155', lineHeight: 1.5 }}>
+                        <li>Buka layar Kiosk di <strong>Komputer A</strong>.</li>
+                        <li>Klik tombol di header atas hingga menjadi: <strong style={{ color: '#1d4ed8' }}>[ PC Ini: 1 Lembar ]</strong>.</li>
+                        <li><em>Atau</em>: Klik 2x <code>atur-ke-1copy.bat</code> di folder Print Bridge.</li>
+                      </ol>
+                    </div>
+
+                    {/* Komputer B: 2 Rangkap */}
+                    <div style={{ background: '#ffffff', padding: '12px 14px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', color: '#15803d', fontSize: '0.88rem', marginBottom: '6px' }}>
+                        <Printer size={15} /> Komputer B (Cetak 2 Rangkap):
+                      </div>
+                      <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '0.77rem', color: '#334155', lineHeight: 1.5 }}>
+                        <li>Buka layar Kiosk di <strong>Komputer B</strong>.</li>
+                        <li>Klik tombol di header atas hingga menjadi: <strong style={{ color: '#15803d' }}>[ PC Ini: 2 Rangkap ]</strong>.</li>
+                        <li><em>Atau</em>: Klik 2x <code>atur-ke-2copy.bat</code> di folder Print Bridge.</li>
+                      </ol>
+                    </div>
                   </div>
                 </div>
 
@@ -3204,13 +3240,13 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
               </div>
             ) : (
               <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: '800' }}>
-                      <th style={{ padding: '0.85rem 1rem' }}>Nama Lengkap</th>
-                      <th style={{ padding: '0.85rem 1rem' }}>Username</th>
-                      <th style={{ padding: '0.85rem 1rem' }}>Peran (Role)</th>
-                      <th style={{ padding: '0.85rem 1rem' }}>Penugasan Poliklinik</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Nama & Username</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Hak Akses Halaman (Multi-Page)</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Poli di Kiosk</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Poli Dipanggil Petugas</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Aksi</th>
                     </tr>
                   </thead>
@@ -3220,66 +3256,91 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         ? u.assignedClinicIds
                         : (u.assignedClinicId ? u.assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : []);
                       const assignedClinics = clinicList.filter(c => userClinicIds.includes(c.id));
+
+                      const kioskClinicIds = Array.isArray(u.assignedKioskClinicIds) && u.assignedKioskClinicIds.length > 0
+                        ? u.assignedKioskClinicIds
+                        : (u.assigned_kiosk_clinic_ids ? u.assigned_kiosk_clinic_ids.split(',').map(s => s.trim()).filter(Boolean) : []);
+                      const kioskClinics = clinicList.filter(c => kioskClinicIds.includes(c.id));
+
+                      const userPages = Array.isArray(u.allowedPages) && u.allowedPages.length > 0
+                        ? u.allowedPages
+                        : (u.allowed_pages ? u.allowed_pages.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : (
+                          u.role === 'ADMIN' ? ['kiosk', 'officer', 'tv', 'admin'] : (u.role === 'PENDAFTARAN' ? ['kiosk'] : ['officer'])
+                        ));
+
                       const isCurrentUser = currentUser?.username === u.username;
-
-                      let badgeBg = '#f1f5f9';
-                      let badgeColor = '#475569';
-                      let roleLabel = u.role;
-
-                      if (u.role === 'ADMIN') {
-                        badgeBg = '#fef3c7';
-                        badgeColor = '#d97706';
-                        roleLabel = 'ADMINISTRATOR';
-                      } else if (u.role === 'PENDAFTARAN') {
-                        badgeBg = '#ecfdf5';
-                        badgeColor = '#15803d';
-                        roleLabel = 'PETUGAS PENDAFTARAN';
-                      } else if (u.role === 'POLIKLINIK') {
-                        badgeBg = '#f0fdf4';
-                        badgeColor = '#16a34a';
-                        roleLabel = 'PETUGAS POLIKLINIK';
-                      } else if (u.role === 'FARMASI') {
-                        badgeBg = '#fefce8';
-                        badgeColor = '#ca8a04';
-                        roleLabel = 'PETUGAS FARMASI';
-                      }
 
                       return (
                         <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.85rem 1rem', fontWeight: '700', color: '#1e293b' }}>
-                            {u.name} {isCurrentUser && <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '6px', marginLeft: '6px' }}>(Anda)</span>}
-                          </td>
-                          <td style={{ padding: '0.85rem 1rem', fontFamily: 'monospace', color: '#334155', fontWeight: '600' }}>
-                            {u.username}
-                          </td>
                           <td style={{ padding: '0.85rem 1rem' }}>
-                            <span style={{
-                              display: 'inline-block',
-                              padding: '4px 10px',
-                              borderRadius: '20px',
-                              fontSize: '0.78rem',
-                              fontWeight: '800',
-                              background: badgeBg,
-                              color: badgeColor
-                            }}>
-                              {roleLabel}
-                            </span>
+                            <div style={{ fontWeight: '800', color: '#1e293b' }}>
+                              {u.name} {isCurrentUser && <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '6px', marginLeft: '4px' }}>(Anda)</span>}
+                            </div>
+                            <div style={{ fontFamily: 'monospace', color: '#64748b', fontSize: '0.78rem' }}>
+                              @{u.username}
+                            </div>
                           </td>
+
+                          {/* Akses Halaman (Multi-Page) */}
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                              {userPages.includes('kiosk') && (
+                                <span style={{ fontSize: '0.74rem', fontWeight: '800', background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '8px', border: '1px solid #bfdbfe', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <Ticket size={12} /> Kiosk
+                                </span>
+                              )}
+                              {userPages.includes('officer') && (
+                                <span style={{ fontSize: '0.74rem', fontWeight: '800', background: '#ecfdf5', color: '#15803d', padding: '3px 8px', borderRadius: '8px', border: '1px solid #a7f3d0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <UserCheck size={12} /> Petugas
+                                </span>
+                              )}
+                              {userPages.includes('tv') && (
+                                <span style={{ fontSize: '0.74rem', fontWeight: '800', background: '#fdf4ff', color: '#9333ea', padding: '3px 8px', borderRadius: '8px', border: '1px solid #f5d0fe', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <Tv size={12} /> TV
+                                </span>
+                              )}
+                              {userPages.includes('admin') && (
+                                <span style={{ fontSize: '0.74rem', fontWeight: '800', background: '#fef3c7', color: '#d97706', padding: '3px 8px', borderRadius: '8px', border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <LayoutDashboard size={12} /> Admin
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Poliklinik di Kiosk */}
                           <td style={{ padding: '0.85rem 1rem', color: '#475569' }}>
-                            {assignedClinics.length > 0 ? (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                                {assignedClinics.map(c => (
-                                  <span key={c.id} style={{ fontSize: '0.75rem', fontWeight: '800', background: '#ecfdf5', color: '#15803d', padding: '2px 8px', borderRadius: '6px' }}>
+                            {kioskClinics.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '240px' }}>
+                                {kioskClinics.map(c => (
+                                  <span key={c.id} style={{ fontSize: '0.72rem', fontWeight: '800', background: '#fef3c7', color: '#b45309', padding: '2px 7px', borderRadius: '6px' }}>
                                     [{c.prefix}] {c.name}
                                   </span>
                                 ))}
                               </div>
                             ) : (
-                              <span style={{ color: '#0d9488', fontSize: '0.8rem', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Check size={13} /> Semua Poliklinik (Umum)
+                              <span style={{ color: '#0d9488', fontSize: '0.78rem', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Check size={13} /> Semua Poliklinik
                               </span>
                             )}
                           </td>
+
+                          {/* Pemanggilan di Layar Petugas */}
+                          <td style={{ padding: '0.85rem 1rem', color: '#475569' }}>
+                            {assignedClinics.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '240px' }}>
+                                {assignedClinics.map(c => (
+                                  <span key={c.id} style={{ fontSize: '0.72rem', fontWeight: '800', background: '#ecfdf5', color: '#15803d', padding: '2px 7px', borderRadius: '6px' }}>
+                                    [{c.prefix}] {c.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#0d9488', fontSize: '0.78rem', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Check size={13} /> Semua Poliklinik
+                              </span>
+                            )}
+                          </td>
+
                           <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: '8px' }}>
                               <button
@@ -3338,19 +3399,24 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
         <div className="modal-overlay" style={{ zIndex: 1200 }}>
           <div style={{
             background: 'white',
-            borderRadius: '20px',
-            width: '90%',
-            maxWidth: '500px',
+            borderRadius: '24px',
+            width: '92%',
+            maxWidth: '680px',
             padding: '2rem',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
+            maxHeight: '90vh',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '1.25rem'
+            flexDirection: 'column'
           }}>
-            <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#0f172a' }}>
-                {editingUser ? 'Edit Data Pengguna' : 'Tambah Pengguna Baru'}
-              </h3>
+            <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>
+                  {editingUser ? 'Edit Data & Hak Akses Pengguna' : 'Tambah Pengguna Baru'}
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '3px 0 0 0' }}>
+                  Atur hak akses halaman, poliklinik di Kiosk, dan hak pemanggilan petugas
+                </p>
+              </div>
               <button
                 onClick={() => setUserModalOpen(false)}
                 style={{ background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
@@ -3359,107 +3425,111 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
               </button>
             </div>
 
-            <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                  Username {!editingUser && <span style={{ color: '#ef4444' }}>*</span>}
-                </label>
-                <input
-                  type="text"
-                  required
-                  disabled={Boolean(editingUser)}
-                  value={userForm.username}
-                  onChange={(e) => setUserForm({ ...userForm, username: e.target.value.toLowerCase().replace(/\s+/g, '') })}
-                  placeholder="Contoh: pendaftaran1"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.9rem',
-                    background: editingUser ? '#f1f5f9' : 'white'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                  Nama Lengkap Pengguna <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={userForm.name}
-                  onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                  placeholder="Contoh: Siti Rahmawati, A.Md"
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                  Peran & Hak Akses (Role) <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <select
-                  value={userForm.role}
-                  onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: '700' }}
-                >
-                  <option value="PENDAFTARAN">Petugas Pendaftaran (Akses Layar Kiosk Pasien)</option>
-                  <option value="POLIKLINIK">Petugas Poliklinik (Akses Layar Pemanggilan Poli)</option>
-                  <option value="FARMASI">Petugas Farmasi (Akses Layar Pemanggilan Farmasi)</option>
-                  <option value="ADMIN">Administrator (Akses Penuh Seluruh Sistem)</option>
-                </select>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155' }}>
-                    Penugasan Poliklinik / Depo (Bisa Pilih Lebih dari 1)
+            <form onSubmit={handleSaveUser} style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* 1. Informasi Akun */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Username {!editingUser && <span style={{ color: '#ef4444' }}>*</span>}
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (userForm.assignedClinicIds.length === clinicList.length) {
-                        setUserForm({ ...userForm, assignedClinicIds: [] });
-                      } else {
-                        setUserForm({ ...userForm, assignedClinicIds: clinicList.map(c => c.id) });
-                      }
+                  <input
+                    type="text"
+                    required
+                    disabled={Boolean(editingUser)}
+                    value={userForm.username}
+                    onChange={(e) => setUserForm({ ...userForm, username: e.target.value.toLowerCase().replace(/\s+/g, '') })}
+                    placeholder="Contoh: petugas1"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.9rem',
+                      background: editingUser ? '#f1f5f9' : 'white'
                     }}
-                    style={{ background: 'none', border: 'none', color: '#15803d', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
-                  >
-                    {userForm.assignedClinicIds.length === clinicList.length ? 'Batal Pilih Semua' : 'Pilih Semua Poli'}
-                  </button>
+                  />
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
-                  gap: '8px',
-                  maxHeight: '190px',
-                  overflowY: 'auto',
-                  padding: '10px',
-                  background: '#f8fafc',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '12px'
-                }}>
-                  {clinicList.map((cli) => {
-                    const isChecked = userForm.assignedClinicIds.includes(cli.id);
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Nama Lengkap <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={userForm.name}
+                    onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                    placeholder="Contoh: Siti Rahmawati, A.Md"
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
+                  />
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    {editingUser ? 'Password Baru (Kosongkan jika tidak diubah)' : 'Password Pengguna *'}
+                  </label>
+                  <input
+                    type="password"
+                    required={!editingUser}
+                    value={userForm.password}
+                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                    placeholder={editingUser ? '••••••••' : 'Minimal 6 karakter'}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* 2. Hak Akses Halaman (Multi-Page Permission) */}
+              <div style={{ background: '#f8fafc', padding: '1.1rem', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.9rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>
+                      Hak Akses Halaman (1 Akun Bisa Akses Beberapa Page) <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      Centang semua halaman yang diizinkan untuk dibuka oleh akun ini
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setUserForm({ ...userForm, allowedPages: ['kiosk', 'officer', 'tv', 'admin'] })}
+                      style={{ background: 'none', border: 'none', color: '#15803d', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Pilih Semua
+                    </button>
+                    <span style={{ color: '#cbd5e1' }}>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setUserForm({ ...userForm, allowedPages: ['kiosk', 'officer'] })}
+                      style={{ background: 'none', border: 'none', color: '#1d4ed8', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Kiosk + Petugas
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  {[
+                    { id: 'kiosk', label: 'Kiosk Pasien', desc: 'Layar antrean mandiri (ambil tiket)', icon: <Ticket size={18} color="#1d4ed8" /> },
+                    { id: 'officer', label: 'Layar Petugas', desc: 'Pemanggilan antrean loket/poli/farmasi', icon: <UserCheck size={18} color="#15803d" /> },
+                    { id: 'tv', label: 'Display TV', desc: 'Monitor tampilan TV ruang tunggu', icon: <Tv size={18} color="#9333ea" /> },
+                    { id: 'admin', label: 'Back-Office Admin', desc: 'Akses penuh pengaturan sistem & laporan', icon: <LayoutDashboard size={18} color="#d97706" /> }
+                  ].map((p) => {
+                    const isChecked = (userForm.allowedPages || []).includes(p.id);
                     return (
                       <label
-                        key={cli.id}
+                        key={p.id}
                         style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '7px 10px',
-                          borderRadius: '8px',
-                          background: isChecked ? '#ecfdf5' : '#ffffff',
-                          border: isChecked ? '1.5px solid #15803d' : '1px solid #e2e8f0',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          background: isChecked ? '#ffffff' : '#f1f5f9',
+                          border: isChecked ? '2px solid #15803d' : '1px solid #e2e8f0',
                           cursor: 'pointer',
-                          fontSize: '0.82rem',
-                          fontWeight: isChecked ? '800' : '600',
-                          color: isChecked ? '#166534' : '#334155',
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -3467,16 +3537,190 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                           type="checkbox"
                           checked={isChecked}
                           onChange={(e) => {
+                            const cur = userForm.allowedPages || [];
                             if (e.target.checked) {
-                              setUserForm({
-                                ...userForm,
-                                assignedClinicIds: [...userForm.assignedClinicIds, cli.id]
-                              });
+                              setUserForm({ ...userForm, allowedPages: [...cur, p.id] });
                             } else {
-                              setUserForm({
-                                ...userForm,
-                                assignedClinicIds: userForm.assignedClinicIds.filter(id => id !== cli.id)
-                              });
+                              setUserForm({ ...userForm, allowedPages: cur.filter(x => x !== p.id) });
+                            }
+                          }}
+                          style={{ width: '18px', height: '18px', accentColor: '#15803d', cursor: 'pointer', marginTop: '2px' }}
+                        />
+                        <div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {p.icon} {p.label}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                            {p.desc}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Pengaturan Kiosk (Poliklinik yang Muncul di Kiosk) */}
+              <div style={{ background: '#f8fafc', padding: '1.1rem', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.9rem', fontWeight: '900', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Ticket size={16} style={{ color: '#1d4ed8' }} /> Poliklinik yang Muncul di Kiosk Pasien
+                    </label>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      Atur tombol poli apa saja yang ditampilkan saat Kiosk dibuka dengan akun ini
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setUserForm({ ...userForm, assignedKioskClinicIds: [] })}
+                      style={{ background: 'none', border: 'none', color: '#0d9488', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Tampilkan Semua
+                    </button>
+                    <span style={{ color: '#cbd5e1' }}>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setUserForm({ ...userForm, assignedKioskClinicIds: clinicList.map(c => c.id) })}
+                      style={{ background: 'none', border: 'none', color: '#15803d', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Centang Semua
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                  gap: '8px',
+                  maxHeight: '160px',
+                  overflowY: 'auto',
+                  padding: '10px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '12px'
+                }}>
+                  {clinicList.map((cli) => {
+                    const isChecked = (userForm.assignedKioskClinicIds || []).includes(cli.id);
+                    return (
+                      <label
+                        key={cli.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: isChecked ? '#eff6ff' : '#ffffff',
+                          border: isChecked ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: isChecked ? '800' : '600',
+                          color: isChecked ? '#1d4ed8' : '#334155'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const cur = userForm.assignedKioskClinicIds || [];
+                            if (e.target.checked) {
+                              setUserForm({ ...userForm, assignedKioskClinicIds: [...cur, cli.id] });
+                            } else {
+                              setUserForm({ ...userForm, assignedKioskClinicIds: cur.filter(id => id !== cli.id) });
+                            }
+                          }}
+                          style={{ cursor: 'pointer', accentColor: '#2563eb', width: '16px', height: '16px' }}
+                        />
+                        <span>[{cli.prefix}] {cli.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px' }}>
+                  {(userForm.assignedKioskClinicIds || []).length === 0 ? (
+                    <span style={{ color: '#0d9488', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Check size={13} /> Menampilkan Semua Poliklinik (Default Kiosk Lengkap)
+                    </span>
+                  ) : (
+                    <span>Hanya <strong>{(userForm.assignedKioskClinicIds || []).length}</strong> poliklinik yang akan muncul di layar Kiosk.</span>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Pengaturan Pemanggilan (Poliklinik yang Berhak Dipanggil di Layar Petugas) */}
+              <div style={{ background: '#f8fafc', padding: '1.1rem', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.9rem', fontWeight: '900', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <UserCheck size={16} style={{ color: '#15803d' }} /> Poliklinik yang Berhak Dipanggil (Layar Petugas)
+                    </label>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      Batasi poli apa saja yang bisa dipilih dan dipanggil antreannya oleh petugas ini
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setUserForm({ ...userForm, assignedClinicIds: [] })}
+                      style={{ background: 'none', border: 'none', color: '#0d9488', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Bisa Semua Poli
+                    </button>
+                    <span style={{ color: '#cbd5e1' }}>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setUserForm({ ...userForm, assignedClinicIds: clinicList.map(c => c.id) })}
+                      style={{ background: 'none', border: 'none', color: '#15803d', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Centang Semua
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                  gap: '8px',
+                  maxHeight: '160px',
+                  overflowY: 'auto',
+                  padding: '10px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '12px'
+                }}>
+                  {clinicList.map((cli) => {
+                    const isChecked = (userForm.assignedClinicIds || []).includes(cli.id);
+                    return (
+                      <label
+                        key={cli.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: isChecked ? '#ecfdf5' : '#ffffff',
+                          border: isChecked ? '1.5px solid #15803d' : '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: isChecked ? '800' : '600',
+                          color: isChecked ? '#166534' : '#334155'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const cur = userForm.assignedClinicIds || [];
+                            if (e.target.checked) {
+                              setUserForm({ ...userForm, assignedClinicIds: [...cur, cli.id] });
+                            } else {
+                              setUserForm({ ...userForm, assignedClinicIds: cur.filter(id => id !== cli.id) });
                             }
                           }}
                           style={{ cursor: 'pointer', accentColor: '#15803d', width: '16px', height: '16px' }}
@@ -3487,36 +3731,24 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                   })}
                 </div>
 
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '5px' }}>
-                  {userForm.assignedClinicIds.length === 0 ? (
-                    <span style={{ color: '#0d9488', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Check size={13} /> Akses Semua Poliklinik (Multilayanan / Tanpa Pembatasan)</span>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px' }}>
+                  {(userForm.assignedClinicIds || []).length === 0 ? (
+                    <span style={{ color: '#0d9488', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Check size={13} /> Akses Semua Poliklinik (Petugas dapat memanggil semua layanan tanpa batasan)
+                    </span>
                   ) : (
-                    <span><strong>{userForm.assignedClinicIds.length}</strong> poliklinik ditugaskan untuk akun ini (Petugas dapat melayani beberapa poli sekaligus).</span>
+                    <span>Petugas ini hanya berwenang memanggil antrean untuk <strong>{(userForm.assignedClinicIds || []).length}</strong> poliklinik terpilih.</span>
                   )}
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                  {editingUser ? 'Password Baru (Kosongkan jika tidak ingin mengubah)' : 'Password Pengguna *'}
-                </label>
-                <input
-                  type="password"
-                  required={!editingUser}
-                  value={userForm.password}
-                  onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                  placeholder={editingUser ? '••••••••' : 'Minimal 6 karakter'}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
                 <button
                   type="submit"
                   className="btn-primary"
                   style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', fontSize: '0.95rem', fontWeight: '800' }}
                 >
-                  <Check size={18} /> {editingUser ? 'Simpan Perubahan' : 'Tambah Pengguna'}
+                  <Check size={18} /> {editingUser ? 'Simpan Perubahan Hak Akses' : 'Tambah Pengguna Baru'}
                 </button>
                 <button
                   type="button"

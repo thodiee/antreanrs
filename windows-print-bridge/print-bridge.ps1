@@ -11,14 +11,38 @@
 
 param(
     [string]$PrinterName = "",
-    [int]$Copies = 2
+    [int]$Copies = 0
 )
 
 # ==============================================================
 # KONFIGURASI PRINT BRIDGE
 # ==============================================================
-# Jumlah lembar cetak default (1 = 1 lembar, 2 = 2 rangkap/copy, dst.)
-$DEFAULT_COPIES = if ($Copies -gt 0) { $Copies } else { 2 }
+# Cari lokasi folder script ini berada untuk menyimpan/membaca bridge-config.json
+$SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Definition
+if ([string]::IsNullOrWhiteSpace($SCRIPT_DIR)) { $SCRIPT_DIR = $PSScriptRoot }
+if ([string]::IsNullOrWhiteSpace($SCRIPT_DIR)) { $SCRIPT_DIR = (Get-Location).Path }
+$CONFIG_FILE = Join-Path $SCRIPT_DIR "bridge-config.json"
+
+# Nilai default awal jika belum diset
+$DEFAULT_COPIES = 2
+
+# 1. Baca konfigurasi lokal bridge-config.json jika file ada
+if (Test-Path $CONFIG_FILE) {
+    try {
+        $cfgJson = Get-Content -Raw $CONFIG_FILE -Encoding UTF8 | ConvertFrom-Json
+        if ($cfgJson.copies -and [int]$cfgJson.copies -gt 0) {
+            $DEFAULT_COPIES = [int]$cfgJson.copies
+        }
+    } catch {}
+}
+
+# 2. Parameter command-line -Copies menimpa konfigurasi jika diberikan secara eksplisit (> 0)
+if ($Copies -gt 0) {
+    $DEFAULT_COPIES = $Copies
+    try {
+        @{ copies = $DEFAULT_COPIES; updatedAt = (Get-Date -Format 's') } | ConvertTo-Json | Set-Content -Path $CONFIG_FILE -Encoding UTF8
+    } catch {}
+}
 
 # Tampilkan label pembeda di atas struk jika mencetak lebih dari 1 copy:
 # $false = Cetakan kedua struk identik/persis sama (Standar Rumah Sakit)
@@ -412,6 +436,7 @@ while ($listener.IsListening) {
                 status = "ok"
                 printer = $PrinterName
                 defaultCopies = $DEFAULT_COPIES
+                configFile = (Test-Path $CONFIG_FILE)
             }
             $jsonStr = $statusObj | ConvertTo-Json -Compress
             $buffer = [System.Text.Encoding]::UTF8.GetBytes($jsonStr)
@@ -419,6 +444,35 @@ while ($listener.IsListening) {
             $response.OutputStream.Write($buffer, 0, $buffer.Length)
             $response.Close()
             continue
+        }
+
+        # Endpoint Ubah Konfigurasi Copies Langsung dari Layar Kiosk / Web Komputer Ini
+        if ($request.HttpMethod -eq "POST" -and $request.RawUrl -match "/set-copies") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $body = $reader.ReadToEnd()
+                $cfgPayload = $body | ConvertFrom-Json
+                $newCopies = if ($cfgPayload.copies) { [int]$cfgPayload.copies } else { 2 }
+                if ($newCopies -lt 1) { $newCopies = 1 }
+                if ($newCopies -gt 5) { $newCopies = 5 }
+                $DEFAULT_COPIES = $newCopies
+
+                # Simpan permanen ke bridge-config.json
+                @{ copies = $newCopies; updatedAt = (Get-Date -Format 's') } | ConvertTo-Json | Set-Content -Path $CONFIG_FILE -Encoding UTF8
+                Write-Host "[CONFIG] Jumlah copy komputer ini diatur ke: $DEFAULT_COPIES Lembar" -ForegroundColor Cyan
+
+                $resObj = @{ success = $true; copies = $DEFAULT_COPIES }
+                $resJson = $resObj | ConvertTo-Json -Compress
+                $resBuffer = [System.Text.Encoding]::UTF8.GetBytes($resJson)
+                $response.ContentType = "application/json"
+                $response.OutputStream.Write($resBuffer, 0, $resBuffer.Length)
+                $response.Close()
+                continue
+            } catch {
+                $response.StatusCode = 500
+                $response.Close()
+                continue
+            }
         }
 
         # Endpoint Print Tiket
@@ -431,11 +485,17 @@ while ($listener.IsListening) {
             $poliName = $ticket.clinicName
             
             # Prioritas penentuan jumlah rangkap copy:
-            # 1. Dari payload request tiket ($ticket.copies)
-            # 2. Dari konfigurasi Print Bridge ($DEFAULT_COPIES)
+            # 1. Jika useLocalBridgeCopies = true, selalu pakai $DEFAULT_COPIES milik Print Bridge komputer ini
+            # 2. Jika payload mengirim ticket.copies valid (angka > 0, bukan string 'device' / 'auto'), gunakan nilai tersebut
+            # 3. Default fallback: gunakan $DEFAULT_COPIES milik Print Bridge komputer ini
             $targetCopies = $DEFAULT_COPIES
-            if ($ticket.copies -and [int]$ticket.copies -gt 0) {
-                $targetCopies = [int]$ticket.copies
+            if (-not $ticket.useLocalBridgeCopies -and $ticket.copies -and "$($ticket.copies)" -ne "device" -and "$($ticket.copies)" -ne "auto") {
+                try {
+                    $cNum = [int]$ticket.copies
+                    if ($cNum -gt 0) {
+                        $targetCopies = $cNum
+                    }
+                } catch {}
             }
 
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] MENCETAK TIKET: $tktNum -> $poliName (Target: $targetCopies Rangkap)" -ForegroundColor Yellow

@@ -185,6 +185,12 @@ export async function initDatabase() {
     try {
       await pool.query('ALTER TABLE users MODIFY COLUMN assigned_clinic_id TEXT DEFAULT NULL');
     } catch {}
+    try {
+      await pool.query('ALTER TABLE users ADD COLUMN allowed_pages TEXT DEFAULT NULL');
+    } catch {}
+    try {
+      await pool.query('ALTER TABLE users ADD COLUMN assigned_kiosk_clinic_ids TEXT DEFAULT NULL');
+    } catch {}
 
     // Auto-migrate hospitals display_settings column
     try {

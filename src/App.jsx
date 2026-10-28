@@ -414,15 +414,20 @@ export default function App() {
     window.open(`/?view=${viewName}`, '_blank');
   };
 
-  // Auth Guard Verification
-  const isKioskAuthorized = currentUser && (currentUser.role === 'PENDAFTARAN' || currentUser.role === 'ADMIN');
-  const isOfficerAuthorized = currentUser && (
-    currentUser.role === 'POLIKLINIK' || 
-    currentUser.role === 'FARMASI' || 
-    currentUser.role === 'OFFICER' || 
-    currentUser.role === 'ADMIN'
+  // Auth Guard Verification with Multi-Page Support
+  const userAllowedPages = currentUser?.allowedPages || (
+    currentUser?.role === 'ADMIN' ? ['kiosk', 'officer', 'tv', 'admin'] :
+    currentUser?.role === 'PENDAFTARAN' ? ['kiosk'] :
+    ['officer']
   );
-  const isAdminAuthorized = currentUser && currentUser.role === 'ADMIN';
+
+  const isKioskAuthorized = currentUser && (currentUser.role === 'ADMIN' || userAllowedPages.includes('kiosk'));
+  const isOfficerAuthorized = currentUser && (
+    currentUser.role === 'ADMIN' ||
+    userAllowedPages.includes('officer') ||
+    ['POLIKLINIK', 'FARMASI', 'OFFICER'].includes(currentUser.role)
+  );
+  const isAdminAuthorized = currentUser && (currentUser.role === 'ADMIN' || userAllowedPages.includes('admin'));
 
   if (currentView === 'beds') {
     return (
@@ -571,6 +576,7 @@ export default function App() {
                 clinics={data.clinics}
                 tickets={data.tickets}
                 onTakeTicket={handleTakeTicket}
+                currentUser={currentUser}
               />
             ) : (
               <LoginForm targetRole="KIOSK" hospital={data.hospital} onLoginSuccess={handleLoginSuccess} />

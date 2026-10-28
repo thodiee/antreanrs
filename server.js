@@ -31,13 +31,31 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
 
 // Helper to sign JWT
 export function signUserToken(user) {
+  const allowedPages = Array.isArray(user.allowedPages)
+    ? user.allowedPages
+    : (user.allowed_pages ? user.allowed_pages.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : (
+      user.role === 'ADMIN' ? ['kiosk', 'officer', 'tv', 'admin'] : (user.role === 'PENDAFTARAN' ? ['kiosk'] : ['officer'])
+    ));
+
+  const assignedKioskClinicIds = Array.isArray(user.assignedKioskClinicIds)
+    ? user.assignedKioskClinicIds
+    : (user.assigned_kiosk_clinic_ids ? user.assigned_kiosk_clinic_ids.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+  const assignedClinicId = user.assignedClinicId || user.assigned_clinic_id || '';
+  const assignedClinicIds = Array.isArray(user.assignedClinicIds)
+    ? user.assignedClinicIds
+    : (assignedClinicId ? assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : []);
+
   return jwt.sign(
     {
       id: user.id,
       username: user.username,
       name: user.name,
       role: user.role,
-      assignedClinicId: user.assignedClinicId || user.assigned_clinic_id || null
+      allowedPages,
+      assignedKioskClinicIds,
+      assignedClinicIds,
+      assignedClinicId: assignedClinicId || null
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -66,8 +84,18 @@ export function requireAuth(allowedRoles = []) {
     if (!user) {
       return res.status(401).json({ success: false, error: 'Token autentikasi tidak valid atau telah kadaluarsa.' });
     }
-    if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-      return res.status(403).json({ success: false, error: 'Akses ditolak. Anda tidak memiliki izin untuk fitur ini.' });
+    if (allowedRoles.length > 0) {
+      const userPages = Array.isArray(user.allowedPages) ? user.allowedPages : [];
+      const hasRoleMatch = allowedRoles.includes(user.role);
+      const hasPageMatch = (
+        (allowedRoles.includes('ADMIN') && (user.role === 'ADMIN' || userPages.includes('admin'))) ||
+        (allowedRoles.includes('PENDAFTARAN') && (user.role === 'PENDAFTARAN' || userPages.includes('kiosk'))) ||
+        ((allowedRoles.includes('POLIKLINIK') || allowedRoles.includes('FARMASI') || allowedRoles.includes('OFFICER')) && (['POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role) || userPages.includes('officer')))
+      );
+
+      if (!hasRoleMatch && !hasPageMatch) {
+        return res.status(403).json({ success: false, error: 'Akses ditolak. Anda tidak memiliki izin untuk fitur ini.' });
+      }
     }
     req.user = user;
     next();
@@ -413,7 +441,7 @@ async function getFullState(user = null) {
   const defaultPrintSettings = {
     paperWidth: '58mm',
     fontSize: 'medium',
-    copies: 2,
+    copies: 'device',
     showLogo: true,
     logoHeight: 60,
     headerSubtitle: 'Sistem Antrean Poliklinik Terpadu',
@@ -556,12 +584,19 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
     const assignedClinicId = user.assigned_clinic_id || '';
     const assignedClinicIds = assignedClinicId ? assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const assignedKioskClinicIds = user.assigned_kiosk_clinic_ids ? user.assigned_kiosk_clinic_ids.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const allowedPages = user.allowed_pages
+      ? user.allowed_pages.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      : (user.role === 'ADMIN' ? ['kiosk', 'officer', 'tv', 'admin'] : (user.role === 'PENDAFTARAN' ? ['kiosk'] : ['officer']));
 
     const token = signUserToken({
       id: user.id,
       username: user.username,
       name: user.name,
       role: user.role,
+      allowedPages,
+      assignedKioskClinicIds,
+      assignedClinicIds,
       assignedClinicId
     });
 
@@ -573,6 +608,8 @@ app.post('/api/login', loginLimiter, async (req, res) => {
         username: user.username,
         name: user.name,
         role: user.role,
+        allowedPages,
+        assignedKioskClinicIds,
         assignedClinicId,
         assignedClinicIds,
         token
@@ -588,7 +625,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 app.get('/api/auth/me', requireAuth(), async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, username, name, role, assigned_clinic_id AS assignedClinicId FROM users WHERE id = ?',
+      'SELECT id, username, name, role, allowed_pages AS allowedPages, assigned_kiosk_clinic_ids AS assignedKioskClinicIds, assigned_clinic_id AS assignedClinicId FROM users WHERE id = ?',
       [req.user.id]
     );
     const user = rows[0];
@@ -598,6 +635,10 @@ app.get('/api/auth/me', requireAuth(), async (req, res) => {
 
     const assignedClinicId = user.assignedClinicId || '';
     const assignedClinicIds = assignedClinicId ? assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const assignedKioskClinicIds = user.assignedKioskClinicIds ? user.assignedKioskClinicIds.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const allowedPages = user.allowedPages
+      ? user.allowedPages.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      : (user.role === 'ADMIN' ? ['kiosk', 'officer', 'tv', 'admin'] : (user.role === 'PENDAFTARAN' ? ['kiosk'] : ['officer']));
 
     res.json({
       success: true,
@@ -606,6 +647,8 @@ app.get('/api/auth/me', requireAuth(), async (req, res) => {
         username: user.username,
         name: user.name,
         role: user.role,
+        allowedPages,
+        assignedKioskClinicIds,
         assignedClinicId,
         assignedClinicIds
       }
@@ -631,12 +674,23 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/users', requireAuth(['ADMIN']), async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, username, name, role, assigned_clinic_id AS assignedClinicId, created_at AS createdAt FROM users ORDER BY created_at ASC'
+      'SELECT id, username, name, role, allowed_pages AS allowedPages, assigned_kiosk_clinic_ids AS assignedKioskClinicIds, assigned_clinic_id AS assignedClinicId, created_at AS createdAt FROM users ORDER BY created_at ASC'
     );
-    const users = rows.map(u => ({
-      ...u,
-      assignedClinicIds: u.assignedClinicId ? u.assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : []
-    }));
+    const users = rows.map(u => {
+      let allowedPages = [];
+      if (u.allowedPages) {
+        allowedPages = u.allowedPages.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      } else {
+        allowedPages = (u.role === 'ADMIN') ? ['kiosk', 'officer', 'tv', 'admin'] : (u.role === 'PENDAFTARAN' ? ['kiosk'] : ['officer']);
+      }
+
+      return {
+        ...u,
+        allowedPages,
+        assignedKioskClinicIds: u.assignedKioskClinicIds ? u.assignedKioskClinicIds.split(',').map(s => s.trim()).filter(Boolean) : [],
+        assignedClinicIds: u.assignedClinicId ? u.assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : []
+      };
+    });
     res.json({ success: true, users });
   } catch (err) {
     console.error('Error fetching users:', err);
@@ -646,9 +700,9 @@ app.get('/api/users', requireAuth(['ADMIN']), async (req, res) => {
 
 app.post('/api/users', requireAuth(['ADMIN']), async (req, res) => {
   try {
-    const { username, password, name, role, assignedClinicId, assignedClinicIds } = req.body;
-    if (!username || !password || !name || !role) {
-      return res.status(400).json({ success: false, error: 'Username, password, nama, dan role wajib diisi.' });
+    const { username, password, name, role, allowedPages, assignedKioskClinicIds, assignedClinicId, assignedClinicIds } = req.body;
+    if (!username || !password || !name) {
+      return res.status(400).json({ success: false, error: 'Username, password, dan nama wajib diisi.' });
     }
 
     if (String(password).length < 6) {
@@ -667,12 +721,24 @@ app.post('/api/users', requireAuth(['ADMIN']), async (req, res) => {
       finalClinicId = assignedClinicId.trim();
     }
 
+    let finalKioskClinicIds = null;
+    if (Array.isArray(assignedKioskClinicIds) && assignedKioskClinicIds.length > 0) {
+      finalKioskClinicIds = assignedKioskClinicIds.join(',');
+    }
+
+    let finalAllowedPages = null;
+    if (Array.isArray(allowedPages) && allowedPages.length > 0) {
+      finalAllowedPages = allowedPages.join(',');
+    } else {
+      finalAllowedPages = (role === 'ADMIN') ? 'kiosk,officer,tv,admin' : (role === 'PENDAFTARAN' ? 'kiosk' : 'officer');
+    }
+
     const passHash = await bcrypt.hash(password, 10);
     const userId = `u_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
     await pool.query(
-      'INSERT INTO users (id, username, password, name, role, assigned_clinic_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, username.trim(), passHash, name.trim(), role, finalClinicId]
+      'INSERT INTO users (id, username, password, name, role, allowed_pages, assigned_kiosk_clinic_ids, assigned_clinic_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, username.trim(), passHash, name.trim(), role || 'OFFICER', finalAllowedPages, finalKioskClinicIds, finalClinicId]
     );
 
     res.json({ success: true, message: 'Pengguna baru berhasil ditambahkan.' });
@@ -685,10 +751,10 @@ app.post('/api/users', requireAuth(['ADMIN']), async (req, res) => {
 app.put('/api/users/:id', requireAuth(['ADMIN']), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, assignedClinicId, assignedClinicIds, password } = req.body;
+    const { name, role, allowedPages, assignedKioskClinicIds, assignedClinicId, assignedClinicIds, password } = req.body;
 
-    if (!name || !role) {
-      return res.status(400).json({ success: false, error: 'Nama dan role wajib diisi.' });
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Nama wajib diisi.' });
     }
 
     let finalClinicId = null;
@@ -698,19 +764,29 @@ app.put('/api/users/:id', requireAuth(['ADMIN']), async (req, res) => {
       finalClinicId = assignedClinicId.trim();
     }
 
+    let finalKioskClinicIds = null;
+    if (Array.isArray(assignedKioskClinicIds)) {
+      finalKioskClinicIds = assignedKioskClinicIds.length > 0 ? assignedKioskClinicIds.join(',') : null;
+    }
+
+    let finalAllowedPages = null;
+    if (Array.isArray(allowedPages)) {
+      finalAllowedPages = allowedPages.length > 0 ? allowedPages.join(',') : null;
+    }
+
     if (password && password.trim()) {
       if (password.trim().length < 6) {
         return res.status(400).json({ success: false, error: 'Password baru minimal terdiri dari 6 karakter.' });
       }
       const passHash = await bcrypt.hash(password.trim(), 10);
       await pool.query(
-        'UPDATE users SET name = ?, role = ?, assigned_clinic_id = ?, password = ? WHERE id = ?',
-        [name.trim(), role, finalClinicId, passHash, id]
+        'UPDATE users SET name = ?, role = ?, allowed_pages = ?, assigned_kiosk_clinic_ids = ?, assigned_clinic_id = ?, password = ? WHERE id = ?',
+        [name.trim(), role || 'OFFICER', finalAllowedPages, finalKioskClinicIds, finalClinicId, passHash, id]
       );
     } else {
       await pool.query(
-        'UPDATE users SET name = ?, role = ?, assigned_clinic_id = ? WHERE id = ?',
-        [name.trim(), role, finalClinicId, id]
+        'UPDATE users SET name = ?, role = ?, allowed_pages = ?, assigned_kiosk_clinic_ids = ?, assigned_clinic_id = ? WHERE id = ?',
+        [name.trim(), role || 'OFFICER', finalAllowedPages, finalKioskClinicIds, finalClinicId, id]
       );
     }
 
@@ -1350,16 +1426,36 @@ io.on('connection', async (socket) => {
     }
   });
 
-  // 2. Call Ticket (Officer) - Requires Staff/Admin Role
+  // 2. Call Ticket (Officer) - Requires Staff/Admin Role or allowedPages including 'officer'/'admin'
   socket.on('call_ticket', async (payload, callback) => {
     try {
       const user = getSocketUser(socket, payload);
-      if (!user || !['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role)) {
+      const userPages = Array.isArray(user?.allowedPages) ? user.allowedPages : [];
+      const hasOfficerAccess = user && (
+        ['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role) ||
+        userPages.includes('officer') ||
+        userPages.includes('admin')
+      );
+
+      if (!hasOfficerAccess) {
         if (callback) callback({ success: false, error: 'Akses ditolak. Pemanggilan tiket memerlukan login Petugas atau Admin.' });
         return;
       }
 
       const { ticketId, counterId, counterName, officerName, clinicId } = payload || {};
+
+      // Validasi penugasan poliklinik pemanggilan
+      const assignedCallIds = Array.isArray(user.assignedClinicIds) && user.assignedClinicIds.length > 0
+        ? user.assignedClinicIds
+        : (user.assignedClinicId ? user.assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+      if (assignedCallIds.length > 0 && user.role !== 'ADMIN' && !userPages.includes('admin')) {
+        if (clinicId && !assignedCallIds.includes(clinicId)) {
+          if (callback) callback({ success: false, error: 'Akses ditolak. Anda tidak berwenang memanggil antrean untuk poliklinik ini.' });
+          return;
+        }
+      }
+
       let targetTicketId = ticketId;
 
       if (!targetTicketId && clinicId) {
@@ -1415,7 +1511,14 @@ io.on('connection', async (socket) => {
   socket.on('recall_ticket', async (payload, callback) => {
     try {
       const user = getSocketUser(socket, payload);
-      if (!user || !['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role)) {
+      const userPages = Array.isArray(user?.allowedPages) ? user.allowedPages : [];
+      const hasOfficerAccess = user && (
+        ['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role) ||
+        userPages.includes('officer') ||
+        userPages.includes('admin')
+      );
+
+      if (!hasOfficerAccess) {
         if (callback) callback({ success: false, error: 'Akses ditolak. Memerlukan hak akses Petugas.' });
         return;
       }
@@ -1479,7 +1582,14 @@ io.on('connection', async (socket) => {
   socket.on('skip_ticket', async (payload, callback) => {
     try {
       const user = getSocketUser(socket, payload);
-      if (!user || !['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role)) {
+      const userPages = Array.isArray(user?.allowedPages) ? user.allowedPages : [];
+      const hasOfficerAccess = user && (
+        ['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role) ||
+        userPages.includes('officer') ||
+        userPages.includes('admin')
+      );
+
+      if (!hasOfficerAccess) {
         if (callback) callback({ success: false, error: 'Akses ditolak. Memerlukan hak akses Petugas.' });
         return;
       }
@@ -1515,7 +1625,14 @@ io.on('connection', async (socket) => {
   socket.on('complete_ticket', async (payload, callback) => {
     try {
       const user = getSocketUser(socket, payload);
-      if (!user || !['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role)) {
+      const userPages = Array.isArray(user?.allowedPages) ? user.allowedPages : [];
+      const hasOfficerAccess = user && (
+        ['ADMIN', 'POLIKLINIK', 'FARMASI', 'OFFICER'].includes(user.role) ||
+        userPages.includes('officer') ||
+        userPages.includes('admin')
+      );
+
+      if (!hasOfficerAccess) {
         if (callback) callback({ success: false, error: 'Akses ditolak. Memerlukan hak akses Petugas.' });
         return;
       }

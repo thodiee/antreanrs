@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Printer, X, QrCode } from 'lucide-react';
 
-export default function ThermalTicketModal({ ticket, hospital, hospitalName, onClose }) {
+export default function ThermalTicketModal({ ticket, hospital, hospitalName, forcedCopies, onClose }) {
   const [countdown, setCountdown] = useState(6);
 
   const activeHospital = hospital || { name: hospitalName };
@@ -24,6 +24,13 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
   };
 
   const shouldAutoPrint = printSettings.autoPrint !== false;
+
+  const localSavedCopies = typeof window !== 'undefined' ? localStorage.getItem('kiosk_local_print_copies') : null;
+  const effectiveCopies = (forcedCopies && Number(forcedCopies) > 0)
+    ? Number(forcedCopies)
+    : (localSavedCopies && (Number(localSavedCopies) === 1 || Number(localSavedCopies) === 2))
+      ? Number(localSavedCopies)
+      : (printSettings.copies === 'device' ? 1 : (Number(printSettings.copies) || 2));
 
   const executePrint = async () => {
     try {
@@ -54,7 +61,7 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',
         fontSize: printSettings.fontSize || 'medium',
-        copies: printSettings.copies ? Number(printSettings.copies) : 2,
+        copies: effectiveCopies,
         showDateTime: printSettings.showDateTime !== false,
         showQrCode: printSettings.showQrCode !== false,
         qrCodeImage: printSettings.qrCodeImage || null,

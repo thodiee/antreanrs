@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, AlertCircle, CheckCircle2, Clock, Printer, CreditCard, Coins, Zap, X } from 'lucide-react';
+import { Ticket, AlertCircle, CheckCircle2, Clock, Printer, CreditCard, Coins, Zap, X, Filter, Check, SlidersHorizontal } from 'lucide-react';
 import ThermalTicketModal from './ThermalTicketModal';
 
-export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) {
+export default function KioskView({ hospital, clinics, tickets, onTakeTicket, currentUser }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [loadingClinicId, setLoadingClinicId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [activeClinicModal, setActiveClinicModal] = useState(null);
+
+  // Local Clinic Filter state for this specific PC / Kiosk screen
+  const [localClinicFilter, setLocalClinicFilter] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kiosk_local_clinic_filter');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [clinicFilterModalOpen, setClinicFilterModalOpen] = useState(false);
+  const [filterTempSelection, setFilterTempSelection] = useState([]);
 
   // Patient details form state
   const [patientForm, setPatientForm] = useState({
@@ -28,8 +40,13 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
     }
   };
 
-  const [bridgeStatus, setBridgeStatus] = useState(null); // { connected: bool, printer: string }
+  const [bridgeStatus, setBridgeStatus] = useState(null); // { connected: bool, printer: string, defaultCopies: number }
   const [directPrintToast, setDirectPrintToast] = useState(null);
+  const [localCopies, setLocalCopies] = useState(() => {
+    const saved = localStorage.getItem('kiosk_local_print_copies');
+    return saved ? Number(saved) : null;
+  });
+  const [copiesNotice, setCopiesNotice] = useState(null);
 
   // Auto detect if local Windows print bridge is running on client machine
   useEffect(() => {
@@ -37,13 +54,17 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
     const checkBridge = async () => {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 1000);
+        const timeout = setTimeout(() => controller.abort(), 1200);
         const res = await fetch('http://localhost:18080/status', { signal: controller.signal });
         clearTimeout(timeout);
         const data = await res.json();
         if (isMounted) {
-          if (data.status === 'ok') {
-            setBridgeStatus({ connected: true, printer: data.printer });
+          if (data && data.status === 'ok') {
+            setBridgeStatus({
+              connected: true,
+              printer: data.printer,
+              defaultCopies: data.defaultCopies ? Number(data.defaultCopies) : 2
+            });
           } else {
             setBridgeStatus({ connected: false });
           }
@@ -59,6 +80,103 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
       clearInterval(interval);
     };
   }, []);
+
+  // Hitung jumlah lembar cetak (copies) efektif untuk komputer ini
+  const getEffectiveCopies = () => {
+    // 1. Setting spesifik yang pernah diatur di browser komputer ini
+    if (localCopies === 1 || localCopies === 2) {
+      return localCopies;
+    }
+    // 2. Jika pusat menyetel 'device' (Bebas per Komputer), utamakan Print Bridge lokal PC ini
+    if (hospital?.printSettings?.copies === 'device') {
+      if (bridgeStatus?.connected && bridgeStatus?.defaultCopies) {
+        return Number(bridgeStatus.defaultCopies);
+      }
+      return 1;
+    }
+    // 3. Jika Print Bridge lokal di PC ini diset 1 copy (misal via 1copy.bat), hormati PC tersebut
+    if (bridgeStatus?.connected && Number(bridgeStatus?.defaultCopies) === 1 && localCopies === null) {
+      return 1;
+    }
+    // 4. Jika pusat menyetel angka 1 atau 2
+    if (hospital?.printSettings?.copies && Number(hospital.printSettings.copies) > 0) {
+      return Number(hospital.printSettings.copies);
+    }
+    // 5. Fallback ke Print Bridge lokal atau default 2
+    return bridgeStatus?.defaultCopies ? Number(bridgeStatus.defaultCopies) : 2;
+  };
+
+  const effectiveCopies = getEffectiveCopies();
+
+  const handleToggleCopies = async () => {
+    const nextCopies = effectiveCopies === 1 ? 2 : 1;
+    localStorage.setItem('kiosk_local_print_copies', String(nextCopies));
+    setLocalCopies(nextCopies);
+
+    // Sinkronisasi otomatis ke Print Bridge lokal PC ini jika aktif
+    if (bridgeStatus?.connected) {
+      try {
+        await fetch('http://localhost:18080/set-copies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ copies: nextCopies })
+        });
+        setBridgeStatus(prev => prev ? ({ ...prev, defaultCopies: nextCopies }) : prev);
+      } catch (e) {
+        console.warn('Sinkronisasi ke local print bridge tidak merespons:', e);
+      }
+    }
+
+    setCopiesNotice(`Pengaturan Komputer Ini Diubah: ${nextCopies === 1 ? '1 Lembar (Standar)' : '2 Rangkap (Pasien & Poli)'}`);
+    setTimeout(() => setCopiesNotice(null), 3500);
+  };
+
+  // Hitung poliklinik yang ditampilkan di Kiosk:
+  // 1. Dari penugasan akun currentUser (assignedKioskClinicIds)
+  // 2. Dari pengaturan filter lokal komputer ini (kiosk_local_clinic_filter)
+  const getEffectiveKioskClinics = () => {
+    if (Array.isArray(currentUser?.assignedKioskClinicIds) && currentUser.assignedKioskClinicIds.length > 0) {
+      return clinics.filter(c => currentUser.assignedKioskClinicIds.includes(c.id));
+    }
+    if (Array.isArray(localClinicFilter) && localClinicFilter.length > 0) {
+      return clinics.filter(c => localClinicFilter.includes(c.id));
+    }
+    return clinics;
+  };
+
+  const displayedClinics = getEffectiveKioskClinics();
+
+  const handleOpenClinicFilter = () => {
+    const currentActiveIds = Array.isArray(localClinicFilter) && localClinicFilter.length > 0
+      ? localClinicFilter
+      : (Array.isArray(currentUser?.assignedKioskClinicIds) && currentUser.assignedKioskClinicIds.length > 0
+        ? currentUser.assignedKioskClinicIds
+        : clinics.map(c => c.id));
+    setFilterTempSelection(currentActiveIds);
+    setClinicFilterModalOpen(true);
+  };
+
+  const handleApplyClinicFilter = () => {
+    if (filterTempSelection.length === clinics.length || filterTempSelection.length === 0) {
+      localStorage.removeItem('kiosk_local_clinic_filter');
+      setLocalClinicFilter(null);
+      setCopiesNotice('Kiosk Ini: Menampilkan Semua Poliklinik');
+    } else {
+      localStorage.setItem('kiosk_local_clinic_filter', JSON.stringify(filterTempSelection));
+      setLocalClinicFilter(filterTempSelection);
+      setCopiesNotice(`Kiosk Ini: Menampilkan ${filterTempSelection.length} Poliklinik`);
+    }
+    setClinicFilterModalOpen(false);
+    setTimeout(() => setCopiesNotice(null), 3500);
+  };
+
+  const handleResetClinicFilter = () => {
+    localStorage.removeItem('kiosk_local_clinic_filter');
+    setLocalClinicFilter(null);
+    setCopiesNotice('Kiosk Ini: Kembali Menampilkan Semua Poliklinik');
+    setClinicFilterModalOpen(false);
+    setTimeout(() => setCopiesNotice(null), 3500);
+  };
 
   const printViaLocalBridge = async (ticket) => {
     try {
@@ -91,7 +209,8 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
         logoHeight: printSettings.logoHeight || 50,
         paperWidth: printSettings.paperWidth || '58mm',
         fontSize: printSettings.fontSize || 'medium',
-        copies: printSettings.copies ? Number(printSettings.copies) : 2,
+        copies: effectiveCopies,
+        useLocalBridgeCopies: (hospital?.printSettings?.copies === 'device' && localCopies === null),
         showDateTime: printSettings.showDateTime !== false,
         showQrCode: printSettings.showQrCode !== false,
         qrCodeImage: printSettings.qrCodeImage || null,
@@ -230,9 +349,33 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
               NOMOR ANTREAN: {directPrintToast.ticketNumber}
             </div>
             <div style={{ fontSize: '0.95rem', opacity: 0.95, fontWeight: '600', marginTop: '2px' }}>
-              Struk berhasil dicetak! Silakan ambil kertas tiket Anda di printer.
+              Struk ({effectiveCopies === 1 ? '1 Lembar' : '2 Rangkap'}) berhasil dicetak! Silakan ambil kertas tiket Anda di printer.
             </div>
           </div>
+        </div>
+      )}
+
+      {copiesNotice && (
+        <div style={{
+          position: 'fixed',
+          top: '25px',
+          right: '25px',
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '16px',
+          fontSize: '0.9rem',
+          fontWeight: '700',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          border: '1px solid #334155',
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          <Printer size={18} style={{ color: '#34d399' }} />
+          <span>{copiesNotice}</span>
         </div>
       )}
 
@@ -251,6 +394,62 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
               <Zap size={14} /> <span>Direct Silent Print Aktif ({bridgeStatus.printer || 'Printer Thermal'})</span>
             </div>
           )}
+
+          {/* Badge Pengatur Lembar Cetak Khusus Komputer Ini */}
+          <button
+            type="button"
+            onClick={handleToggleCopies}
+            title="Klik untuk mengubah jumlah lembar cetak khusus komputer ini (1 Lembar atau 2 Rangkap)"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              background: effectiveCopies === 1 ? '#eff6ff' : '#f0fdf4',
+              color: effectiveCopies === 1 ? '#1d4ed8' : '#15803d',
+              border: effectiveCopies === 1 ? '1px solid #bfdbfe' : '1px solid #bbf7d0',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: '800',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+            }}
+          >
+            <Printer size={14} />
+            <span>PC Ini: {effectiveCopies === 1 ? '1 Lembar (Standar)' : '2 Rangkap (Pasien & Poli)'}</span>
+            <span style={{ fontSize: '0.68rem', opacity: 0.8, background: 'rgba(0,0,0,0.07)', padding: '1px 6px', borderRadius: '8px' }}>
+              Klik ganti
+            </span>
+          </button>
+
+          {/* Badge Pengatur Poliklinik Khusus Kiosk Ini */}
+          <button
+            type="button"
+            onClick={handleOpenClinicFilter}
+            title="Klik untuk memilih poliklinik apa saja yang muncul di layar Kiosk ini"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              background: displayedClinics.length < clinics.length ? '#fef3c7' : '#eff6ff',
+              color: displayedClinics.length < clinics.length ? '#b45309' : '#1d4ed8',
+              border: displayedClinics.length < clinics.length ? '1.5px solid #fde68a' : '1px solid #bfdbfe',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: '800',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+            }}
+          >
+            <SlidersHorizontal size={14} />
+            <span>Poli Kiosk: {displayedClinics.length === clinics.length ? 'Semua Poli' : `${displayedClinics.length} Terpilih`}</span>
+            <span style={{ fontSize: '0.68rem', opacity: 0.85, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: '8px' }}>
+              Atur
+            </span>
+          </button>
         </div>
         <h2 className="kiosk-title">{hospital?.name || 'Rumah Sakit'}</h2>
         <p className="kiosk-subtitle">Silakan sentuh poliklinik yang ingin Anda tuju untuk mengambil nomor antrean</p>
@@ -264,7 +463,23 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
       )}
 
       <div className="kiosk-grid">
-        {clinics.map((clinic) => {
+        {displayedClinics.length === 0 ? (
+          <div style={{ gridColumn: '1 / -1', padding: '3.5rem 1.5rem', textAlign: 'center', background: 'white', borderRadius: '24px', border: '2px dashed #cbd5e1' }}>
+            <AlertCircle size={44} style={{ color: '#f59e0b', margin: '0 auto 1rem auto' }} />
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', marginBottom: '0.5rem' }}>Tidak Ada Poliklinik Ditampilkan</h3>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.25rem', maxWidth: '420px', margin: '0 auto 1.25rem auto' }}>
+              Kiosk ini sedang diatur untuk menyaring layanan tertentu. Tidak ada poliklinik aktif yang dipilih.
+            </p>
+            <button
+              onClick={handleResetClinicFilter}
+              className="btn-primary"
+              style={{ padding: '0.75rem 1.75rem', borderRadius: '12px', fontWeight: '800' }}
+            >
+              Tampilkan Semua Poliklinik
+            </button>
+          </div>
+        ) : (
+          displayedClinics.map((clinic) => {
           const clinicTicketsToday = tickets.filter(
             (t) => t.clinicId === clinic.id && getNormalizedDate(t.date) === today
           );
@@ -337,7 +552,7 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
 
       {/* Patient Identification Registration Modal */}
@@ -490,10 +705,137 @@ export default function KioskView({ hospital, clinics, tickets, onTakeTicket }) 
         </div>
       )}
 
+      {/* Modal Pengaturan Poliklinik Khusus Kiosk Ini */}
+      {clinicFilterModalOpen && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            width: '92%',
+            maxWidth: '560px',
+            padding: '2rem',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <SlidersHorizontal size={20} style={{ color: '#15803d' }} /> Filter Poliklinik Kiosk Ini
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Pilih poliklinik apa saja yang ingin dimunculkan tombolnya di layar Kiosk komputer ini.
+                </p>
+              </div>
+              <button
+                onClick={() => setClinicFilterModalOpen(false)}
+                style={{ background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: '700' }}>
+                {filterTempSelection.length} dari {clinics.length} poliklinik dipilih
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setFilterTempSelection(clinics.map(c => c.id))}
+                  style={{ background: 'none', border: 'none', color: '#15803d', fontSize: '0.78rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Pilih Semua
+                </button>
+                <span style={{ color: '#cbd5e1' }}>|</span>
+                <button
+                  type="button"
+                  onClick={() => setFilterTempSelection([])}
+                  style={{ background: 'none', border: 'none', color: '#b91c1c', fontSize: '0.78rem', fontWeight: '800', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Kosongkan
+                </button>
+              </div>
+            </div>
+
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              maxHeight: '340px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '10px',
+              background: '#f8fafc',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+              gap: '8px',
+              marginBottom: '1.25rem'
+            }}>
+              {clinics.map((c) => {
+                const isChecked = filterTempSelection.includes(c.id);
+                return (
+                  <label
+                    key={c.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      background: isChecked ? '#ecfdf5' : '#ffffff',
+                      border: isChecked ? '1.5px solid #15803d' : '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: isChecked ? '800' : '600',
+                      color: isChecked ? '#166534' : '#334155',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFilterTempSelection([...filterTempSelection, c.id]);
+                        } else {
+                          setFilterTempSelection(filterTempSelection.filter(id => id !== c.id));
+                        }
+                      }}
+                      style={{ width: '17px', height: '17px', accentColor: '#15803d', cursor: 'pointer' }}
+                    />
+                    <span>[{c.prefix}] {c.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={handleResetClinicFilter}
+                style={{ padding: '0.75rem 1.25rem', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '12px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer' }}
+              >
+                Reset (Tampilkan Semua)
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyClinicFilter}
+                className="btn-primary"
+                style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', fontWeight: '800', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Check size={16} /> Terapkan di Kiosk Ini
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedTicket && (
         <ThermalTicketModal
           ticket={selectedTicket}
           hospital={hospital}
+          forcedCopies={effectiveCopies}
           onClose={() => setSelectedTicket(null)}
         />
       )}

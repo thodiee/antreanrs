@@ -26,19 +26,23 @@ export default function LoginForm({ targetRole, hospital, onLoginSuccess }) {
         const role = data.user.role;
         const isAdmin = role === 'ADMIN';
 
+        const allowedPages = Array.isArray(data.user.allowedPages) && data.user.allowedPages.length > 0
+          ? data.user.allowedPages
+          : (isAdmin ? ['kiosk', 'officer', 'tv', 'admin'] : (role === 'PENDAFTARAN' ? ['kiosk'] : ['officer']));
+
         if (targetRole === 'KIOSK') {
-          if (!isAdmin && role !== 'PENDAFTARAN') {
-            setErrorMsg(`Akun (${role}) tidak memiliki izin membuka Kiosk Pasien. Hanya Petugas Pendaftaran atau Admin.`);
+          if (!isAdmin && !allowedPages.includes('kiosk')) {
+            setErrorMsg(`Akun (${data.user.username}) tidak memiliki hak akses membuka Kiosk Pasien.`);
             return;
           }
         } else if (targetRole === 'OFFICER') {
-          if (!isAdmin && role !== 'POLIKLINIK' && role !== 'FARMASI' && role !== 'OFFICER') {
-            setErrorMsg(`Akun (${role}) tidak memiliki izin Layar Petugas. Hanya Petugas Poliklinik, Farmasi, atau Admin.`);
+          if (!isAdmin && !allowedPages.includes('officer')) {
+            setErrorMsg(`Akun (${data.user.username}) tidak memiliki hak akses Layar Pemanggilan Petugas.`);
             return;
           }
         } else if (targetRole === 'ADMIN') {
-          if (!isAdmin) {
-            setErrorMsg(`Akun (${role}) bukan Administrator. Akses ditolak.`);
+          if (!isAdmin && !allowedPages.includes('admin')) {
+            setErrorMsg(`Akun (${data.user.username}) tidak memiliki hak akses Administrator Sistem.`);
             return;
           }
         }

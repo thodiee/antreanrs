@@ -12,9 +12,9 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
     : (currentUser?.assignedClinicId ? currentUser.assignedClinicId.split(',').map(s => s.trim()).filter(Boolean) : []);
 
   // Filter available clinics for this officer:
-  // If user has specific assigned clinics and is not an ADMIN, only allow their assigned clinics.
+  // If user has specific assigned clinics, strictly restrict to those clinics.
   // Otherwise, allow all clinics.
-  const allowedClinics = (userAssignedClinicIds.length > 0 && currentUser?.role !== 'ADMIN')
+  const allowedClinics = (userAssignedClinicIds.length > 0)
     ? clinics.filter(c => userAssignedClinicIds.includes(c.id))
     : clinics;
 
