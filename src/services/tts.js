@@ -39,7 +39,10 @@ class TtsEngine {
 
   speakCall(ticket, counterName, clinicName) {
     const spokenNum = this.formatTicketForSpeech(ticket.ticketNumber);
-    const destination = counterName || clinicName || 'Loket';
+    let destination = (counterName || clinicName || 'Loket').trim();
+    if (/^\d+$/.test(destination)) {
+      destination = `Loket ${destination}`;
+    }
     const text = `Nomor antrean, ${spokenNum}, ke, ${destination}`;
 
     this.queue.push({ text, ticket });

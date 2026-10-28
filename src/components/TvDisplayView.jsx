@@ -726,6 +726,11 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
                       <span style={{ fontSize: `${displaySettings.clinicNameFontSize || 1.35}rem`, fontWeight: '900', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={clinic.name}>
                         {clinic.name}
                       </span>
+                      {(clinic.counterName || lastCalledTicket?.counterName) && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', background: '#f8fafc', color: '#15803d', border: '1px solid #cbd5e1', padding: '1px 6px', borderRadius: '6px', flexShrink: 0 }}>
+                          {clinic.counterName || lastCalledTicket?.counterName}
+                        </span>
+                      )}
                     </div>
 
                     <span style={{

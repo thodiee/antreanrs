@@ -206,6 +206,11 @@ export default function ThermalTicketModal({ ticket, hospital, hospitalName, onC
             <p style={{ fontSize: '0.9em', fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>
               {ticket.clinicName}
             </p>
+            {ticket.counterName && (
+              <p style={{ fontSize: '0.85em', fontWeight: 'bold', color: '#15803d', margin: '2px 0 0 0' }}>
+                {ticket.counterName}
+              </p>
+            )}
             <div className="thermal-num">{ticket.ticketNumber}</div>
             <p style={{ fontSize: '0.8em', color: '#334155', margin: 0 }}>
               Urutan Ke-<strong>{ticket.sequence}</strong>

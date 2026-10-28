@@ -135,6 +135,10 @@ export default function App() {
 
     function onTicketRecalled({ ticket, timestamp }) {
       setLastCall({ ticket, timestamp });
+      setData(prev => ({
+        ...prev,
+        tickets: prev.tickets.map(t => t.id === ticket.id ? { ...t, ...ticket } : t)
+      }));
     }
 
     function onTicketSkipped({ ticket }) {

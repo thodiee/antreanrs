@@ -373,7 +373,7 @@ async function getFullState(user = null) {
     }
   }
   const [infoSlides] = await pool.query('SELECT id, tag, icon, title, subtitle, description, sort_order AS sortOrder FROM info_slides ORDER BY sort_order ASC');
-  const [clinics] = await pool.query('SELECT id, name, prefix, quota, active, description, sort_order AS sortOrder, schedule_days AS scheduleDays FROM clinics ORDER BY sort_order ASC, name ASC');
+  const [clinics] = await pool.query('SELECT id, name, prefix, quota, active, description, sort_order AS sortOrder, schedule_days AS scheduleDays, counter_name AS counterName FROM clinics ORDER BY sort_order ASC, name ASC');
   const [counters] = await pool.query('SELECT id, name, clinic_id AS clinicId FROM counters');
   const [beds] = await pool.query(
     `SELECT id, room_name AS roomName, bed_class AS bedClass, 
@@ -1000,14 +1000,34 @@ async function processSaveSettings(payload) {
   }
 
   if (payload.clinics && Array.isArray(payload.clinics)) {
+    // Validate that counter names/numbers are unique across clinics
+    const seenCounters = new Set();
+    const duplicates = [];
+    for (let i = 0; i < payload.clinics.length; i++) {
+      const c = payload.clinics[i];
+      const counterName = c.counterName ? c.counterName.trim() : `Loket ${i + 1}`;
+      const lower = counterName.toLowerCase();
+      if (seenCounters.has(lower)) {
+        duplicates.push(counterName);
+      } else {
+        seenCounters.add(lower);
+      }
+    }
+    if (duplicates.length > 0) {
+      const err = new Error(`Nomor Loket tidak boleh sama antar poliklinik! Terdapat nomor kembar: ${[...new Set(duplicates)].join(', ')}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
     for (let i = 0; i < payload.clinics.length; i++) {
       const c = payload.clinics[i];
       const sortOrder = c.sortOrder !== undefined ? c.sortOrder : i + 1;
       const scheduleDays = Array.isArray(c.scheduleDays) ? c.scheduleDays.join(',') : (c.scheduleDays || 'Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu');
+      const counterName = c.counterName ? c.counterName.trim() : `Loket ${i + 1}`;
 
       await pool.query(
-        `INSERT INTO clinics (id, name, prefix, quota, active, description, sort_order, schedule_days)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO clinics (id, name, prefix, quota, active, description, sort_order, schedule_days, counter_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE 
            name = VALUES(name), 
            prefix = VALUES(prefix), 
@@ -1015,8 +1035,9 @@ async function processSaveSettings(payload) {
            active = VALUES(active), 
            description = VALUES(description),
            sort_order = VALUES(sort_order),
-           schedule_days = VALUES(schedule_days)`,
-        [c.id, c.name, c.prefix, c.quota, c.active ? 1 : 0, c.description || '', sortOrder, scheduleDays]
+           schedule_days = VALUES(schedule_days),
+           counter_name = VALUES(counter_name)`,
+        [c.id, c.name, c.prefix, c.quota, c.active ? 1 : 0, c.description || '', sortOrder, scheduleDays, counterName]
       );
     }
   }
@@ -1295,10 +1316,12 @@ io.on('connection', async (socket) => {
       const safePhone = (phone && String(phone).trim()) ? String(phone).trim().substring(0, 30) : '-';
       const safePatientType = (patientType && String(patientType).trim()) ? String(patientType).trim().substring(0, 20) : 'BPJS';
 
+      const defaultCounterName = clinic.counter_name || null;
+
       await pool.query(
-        `INSERT INTO tickets (id, ticket_number, sequence, clinic_id, clinic_name, prefix, patient_name, nik, norm, phone, patient_type, date, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'WAITING', ?)`,
-        [ticketId, ticketNumber, nextSeq, clinic.id, clinic.name, clinic.prefix, safePatientName, safeNik, safeNorm, safePhone, safePatientType, today, createdAtStr]
+        `INSERT INTO tickets (id, ticket_number, sequence, clinic_id, clinic_name, prefix, patient_name, nik, norm, phone, patient_type, date, status, created_at, counter_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'WAITING', ?, ?)`,
+        [ticketId, ticketNumber, nextSeq, clinic.id, clinic.name, clinic.prefix, safePatientName, safeNik, safeNorm, safePhone, safePatientType, today, createdAtStr, defaultCounterName]
       );
 
       const newTicket = {
@@ -1315,7 +1338,8 @@ io.on('connection', async (socket) => {
         patientType: safePatientType,
         date: today,
         status: 'WAITING',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        counterName: defaultCounterName
       };
 
       io.emit('ticket_created', { ticket: newTicket });
@@ -1365,6 +1389,7 @@ io.on('connection', async (socket) => {
       const ticket = {
         id: raw.id,
         ticketNumber: raw.ticket_number,
+        patientName: raw.patient_name,
         sequence: raw.sequence,
         clinicId: raw.clinic_id,
         clinicName: raw.clinic_name,
@@ -1395,9 +1420,27 @@ io.on('connection', async (socket) => {
         return;
       }
 
-      const { ticketId } = payload || {};
+      const { ticketId, counterId, counterName, officerName } = payload || {};
       const calledAtStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      await pool.query(`UPDATE tickets SET called_at = ? WHERE id = ?`, [calledAtStr, ticketId]);
+      
+      let updateSql = `UPDATE tickets SET called_at = ?, status = 'CALLED'`;
+      const updateParams = [calledAtStr];
+      if (counterId) {
+        updateSql += `, counter_id = ?`;
+        updateParams.push(counterId);
+      }
+      if (counterName) {
+        updateSql += `, counter_name = ?`;
+        updateParams.push(counterName);
+      }
+      if (officerName) {
+        updateSql += `, officer_name = ?`;
+        updateParams.push(officerName);
+      }
+      updateSql += ` WHERE id = ?`;
+      updateParams.push(ticketId);
+
+      await pool.query(updateSql, updateParams);
 
       const [rows] = await pool.query(`SELECT * FROM tickets WHERE id = ?`, [ticketId]);
       const raw = rows[0];
@@ -1410,6 +1453,7 @@ io.on('connection', async (socket) => {
       const ticket = {
         id: raw.id,
         ticketNumber: raw.ticket_number,
+        patientName: raw.patient_name,
         sequence: raw.sequence,
         clinicId: raw.clinic_id,
         clinicName: raw.clinic_name,
@@ -1448,6 +1492,7 @@ io.on('connection', async (socket) => {
       const ticket = {
         id: raw.id,
         ticketNumber: raw.ticket_number,
+        patientName: raw.patient_name,
         sequence: raw.sequence,
         clinicId: raw.clinic_id,
         clinicName: raw.clinic_name,
@@ -1485,6 +1530,7 @@ io.on('connection', async (socket) => {
       const ticket = {
         id: raw.id,
         ticketNumber: raw.ticket_number,
+        patientName: raw.patient_name,
         sequence: raw.sequence,
         clinicId: raw.clinic_id,
         clinicName: raw.clinic_name,

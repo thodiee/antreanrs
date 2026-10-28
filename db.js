@@ -74,7 +74,8 @@ export async function initDatabase() {
         active TINYINT(1) DEFAULT 1,
         description TEXT,
         sort_order INT DEFAULT 0,
-        schedule_days VARCHAR(255) DEFAULT 'Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu'
+        schedule_days VARCHAR(255) DEFAULT 'Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu',
+        counter_name VARCHAR(100) DEFAULT NULL
       );
 
       CREATE TABLE IF NOT EXISTS counters (
@@ -166,6 +167,16 @@ export async function initDatabase() {
     try {
       await pool.query("ALTER TABLE clinics ADD COLUMN schedule_days VARCHAR(255) DEFAULT 'Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu'");
     } catch {}
+    try {
+      await pool.query('ALTER TABLE clinics ADD COLUMN counter_name VARCHAR(100) DEFAULT NULL');
+    } catch {}
+    try {
+      // Auto-assign default counter_name (Loket 1, Loket 2, etc.) for existing clinics without one
+      const [rows] = await pool.query("SELECT id, sort_order FROM clinics WHERE counter_name IS NULL OR counter_name = '' ORDER BY sort_order ASC, id ASC");
+      for (let idx = 0; idx < rows.length; idx++) {
+        await pool.query("UPDATE clinics SET counter_name = ? WHERE id = ?", [`Loket ${idx + 1}`, rows[idx].id]);
+      }
+    } catch {}
 
     // Auto-migrate users role & assigned_clinic_id column
     try {
@@ -247,13 +258,13 @@ export async function initDatabase() {
     const [clinics] = await pool.query('SELECT COUNT(*) as cnt FROM clinics');
     if (clinics[0].cnt === 0) {
       await pool.query(
-        `INSERT INTO clinics (id, name, prefix, quota, active, description) VALUES
-        ('c1', 'Poliklinik Umum', 'A', 50, 1, 'Pemeriksaan kesehatan umum & rujukan'),
-        ('c2', 'Poliklinik Gigi & Mulut', 'B', 30, 1, 'Perawatan & konsultasi kesehatan gigi'),
-        ('c3', 'Poliklinik KIA / Kebidanan', 'C', 40, 1, 'Kesehatan ibu, anak, dan imunisasi'),
-        ('c4', 'Poliklinik Spesialis Anak', 'D', 25, 1, 'Dokter spesialis kesehatan anak'),
-        ('c5', 'Poliklinik Penyakit Dalam', 'E', 35, 1, 'Konsultasi organ dalam & spesialis'),
-        ('c6', 'Apotek & Depo Farmasi', 'F', 100, 1, 'Pengambilan resep obat & konsultasi obat')`
+        `INSERT INTO clinics (id, name, prefix, quota, active, description, counter_name) VALUES
+        ('c1', 'Poliklinik Umum', 'A', 50, 1, 'Pemeriksaan kesehatan umum & rujukan', 'Loket 1'),
+        ('c2', 'Poliklinik Gigi & Mulut', 'B', 30, 1, 'Perawatan & konsultasi kesehatan gigi', 'Loket 2'),
+        ('c3', 'Poliklinik KIA / Kebidanan', 'C', 40, 1, 'Kesehatan ibu, anak, dan imunisasi', 'Loket 3'),
+        ('c4', 'Poliklinik Spesialis Anak', 'D', 25, 1, 'Dokter spesialis kesehatan anak', 'Loket 4'),
+        ('c5', 'Poliklinik Penyakit Dalam', 'E', 35, 1, 'Konsultasi organ dalam & spesialis', 'Loket 5'),
+        ('c6', 'Apotek & Depo Farmasi', 'F', 100, 1, 'Pengambilan resep obat & konsultasi obat', 'Loket Farmasi 1')`
       );
     }
 

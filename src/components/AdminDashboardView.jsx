@@ -5,6 +5,12 @@ import { parseVideoUrl } from '../utils/videoHelper';
 
 const DAYS_LIST = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
+const getCounterNumber = (counterName, defaultNum = 1) => {
+  if (counterName === undefined || counterName === null || counterName === '') return defaultNum;
+  const match = String(counterName).match(/\d+/);
+  return match ? parseInt(match[0], 10) : defaultNum;
+};
+
 export default function AdminDashboardView({ hospital, clinics = [], counters = [], tickets = [], history = [], beds: propBeds = [], onUpdateSettings, onResetShift, currentUser }) {
   const [activeTab, setActiveTab] = useState('overview'); // overview, clinics, tv, print, users, beds, reset
   const [hospitalForm, setHospitalForm] = useState(hospital || {});
@@ -736,13 +742,73 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   };
 
   const handleSaveClinics = () => {
+    // Check for duplicate counter numbers
+    const usedCounts = {};
+    const duplicates = [];
+    clinicList.forEach((c, idx) => {
+      const num = getCounterNumber(c.counterName, idx + 1);
+      if (usedCounts[num]) {
+        duplicates.push(num);
+      } else {
+        usedCounts[num] = true;
+      }
+    });
+
+    if (duplicates.length > 0) {
+      const uniqueDups = [...new Set(duplicates)];
+      showToast(`Gagal menyimpan: Nomor Loket tidak boleh sama! Ditemukan nomor kembar: Loket ${uniqueDups.join(', Loket ')}. Harap ubah agar berbeda atau klik tombol "⚡ Urutkan 1..N".`, 'danger');
+      return;
+    }
+
+    // Generate counters synced from clinics so counters list stays in sync
+    const syncedCounters = clinicList.map((c, idx) => {
+      const num = getCounterNumber(c.counterName, idx + 1);
+      return {
+        id: `cnt_${c.id}`,
+        name: `Loket ${num}`,
+        clinicId: c.id
+      };
+    });
+
     onUpdateSettings({ 
-      clinics: clinicList,
-      counters: counterList
+      clinics: clinicList.map((c, idx) => ({
+        ...c,
+        counterName: `Loket ${getCounterNumber(c.counterName, idx + 1)}`
+      })),
+      counters: syncedCounters
     }, (res) => {
-      if (res.success) showToast('Katalog Poliklinik berhasil disimpan!');
+      if (res.success) showToast('Katalog Poliklinik & Pengaturan Nomor Loket berhasil disimpan!');
       else showToast(res.error || 'Gagal menyimpan pengaturan.', 'danger');
     });
+  };
+
+  const handleUpdateClinicCounterNumber = (clinicId, numValue) => {
+    const parsed = numValue === '' ? '' : Math.max(1, parseInt(numValue, 10) || 1);
+    const formatted = parsed === '' ? '' : `Loket ${parsed}`;
+    setClinicList(clinicList.map(c => c.id === clinicId ? { ...c, counterName: formatted } : c));
+  };
+
+  const handleSwapClinicCounterNumber = (clinicIdA, clinicIdB) => {
+    const clinicA = clinicList.find(c => c.id === clinicIdA);
+    const clinicB = clinicList.find(c => c.id === clinicIdB);
+    if (!clinicA || !clinicB) return;
+    const counterA = clinicA.counterName;
+    const counterB = clinicB.counterName;
+    setClinicList(clinicList.map(c => {
+      if (c.id === clinicIdA) return { ...c, counterName: counterB };
+      if (c.id === clinicIdB) return { ...c, counterName: counterA };
+      return c;
+    }));
+    showToast(`Nomor loket '${clinicA.name}' dan '${clinicB.name}' berhasil ditukar.`);
+  };
+
+  const handleAutoSequenceLoket = () => {
+    const resequenced = clinicList.map((c, idx) => ({
+      ...c,
+      counterName: `Loket ${idx + 1}`
+    }));
+    setClinicList(resequenced);
+    showToast(`Semua nomor loket berhasil diurutkan otomatis (1 s/d ${clinicList.length}) tanpa nomor kembar!`);
   };
 
   const handleAddCounter = () => {
@@ -766,13 +832,19 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
 
   const handleAddClinic = () => {
     const newId = `c_${Date.now()}`;
+    const usedNumbers = clinicList.map((c, i) => getCounterNumber(c.counterName, i + 1));
+    let nextNum = 1;
+    while (usedNumbers.includes(nextNum)) {
+      nextNum++;
+    }
     const newClinic = {
       id: newId,
       name: 'Poliklinik Baru',
       prefix: 'X',
       quota: 30,
       active: true,
-      description: 'Deskripsi poliklinik'
+      description: 'Deskripsi poliklinik',
+      counterName: `Loket ${nextNum}`
     };
     setClinicList([...clinicList, newClinic]);
   };
@@ -1079,6 +1151,29 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                 <th>Status</th>
                 <th>Prefix</th>
                 <th>Nama Poliklinik</th>
+                <th>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <span>Nomor Loket</span>
+                    <button
+                      type="button"
+                      onClick={handleAutoSequenceLoket}
+                      style={{
+                        fontSize: '0.68rem',
+                        padding: '2px 7px',
+                        background: '#ecfdf5',
+                        color: '#15803d',
+                        border: '1px solid #86efac',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '800',
+                        whiteSpace: 'nowrap'
+                      }}
+                      title="Klik untuk mengurutkan nomor loket otomatis 1, 2, 3... berurutan tanpa kembar"
+                    >
+                      ⚡ Urutkan 1..N
+                    </button>
+                  </div>
+                </th>
                 <th>Jadwal Buka Operasional (Hari)</th>
                 <th>Kuota Pasien</th>
                 <th>Buka / Tutup</th>
@@ -1139,6 +1234,87 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         onChange={(e) => handleUpdateClinicField(c.id, 'name', e.target.value)}
                         style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: '600' }}
                       />
+                    </td>
+
+                    <td>
+                      {(() => {
+                        const currentNum = getCounterNumber(c.counterName, idx + 1);
+                        // Calculate usage across clinicList
+                        const usageList = clinicList.filter((other, i) => getCounterNumber(other.counterName, i + 1) === currentNum);
+                        const isDuplicate = usageList.length > 1;
+                        const conflictingClinics = isDuplicate ? usageList.filter(other => other.id !== c.id) : [];
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              border: isDuplicate ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              background: '#ffffff',
+                              boxShadow: isDuplicate ? '0 0 0 3px rgba(239, 68, 68, 0.15)' : 'none'
+                            }}>
+                              <span style={{
+                                padding: '5px 8px',
+                                background: isDuplicate ? '#fee2e2' : '#f8fafc',
+                                color: isDuplicate ? '#b91c1c' : '#475569',
+                                fontWeight: '800',
+                                fontSize: '0.85rem',
+                                borderRight: '1px solid #cbd5e1',
+                                userSelect: 'none'
+                              }}>
+                                Loket
+                              </span>
+                              <input
+                                type="number"
+                                min="1"
+                                max="999"
+                                value={currentNum}
+                                onChange={(e) => handleUpdateClinicCounterNumber(c.id, e.target.value)}
+                                style={{
+                                  width: '50px',
+                                  padding: '5px 6px',
+                                  border: 'none',
+                                  outline: 'none',
+                                  textAlign: 'center',
+                                  fontWeight: '800',
+                                  color: isDuplicate ? '#b91c1c' : '#15803d',
+                                  fontSize: '0.95rem'
+                                }}
+                                title={`Nomor loket untuk ${c.name} (Hanya ubah angka)`}
+                              />
+                            </div>
+
+                            {isDuplicate && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#b91c1c', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px' }}>
+                                  ⚠️ Kembar!
+                                </span>
+                                {conflictingClinics.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSwapClinicCounterNumber(c.id, conflictingClinics[0].id)}
+                                    style={{
+                                      fontSize: '0.68rem',
+                                      fontWeight: '800',
+                                      color: '#1e40af',
+                                      background: '#dbeafe',
+                                      border: '1px solid #bfdbfe',
+                                      padding: '1px 6px',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer'
+                                    }}
+                                    title={`Tukar nomor loket dengan ${conflictingClinics[0].name}`}
+                                  >
+                                    Tukar ⇄
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     <td>
