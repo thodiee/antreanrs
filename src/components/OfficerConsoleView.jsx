@@ -203,7 +203,7 @@ export default function OfficerConsoleView({ clinics = [], counters = [], ticket
   // Re-call any ticket (active, passed, or skipped/kelewat) to current counter with sound & TTS
   const handleRecallSpecific = (targetTicket) => {
     if (!targetTicket) return;
-    onCallTicket({
+    onRecallTicket({
       ticketId: targetTicket.id,
       clinicId: activeClinic?.id,
       counterId: activeCounter?.id || `cnt_${activeClinic?.id || '1'}`,

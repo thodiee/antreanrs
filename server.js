@@ -1095,6 +1095,11 @@ async function processSaveSettings(payload) {
       throw err;
     }
 
+    const activeClinicIds = payload.clinics.map(c => c.id).filter(Boolean);
+    if (activeClinicIds.length > 0) {
+      await pool.query('DELETE FROM clinics WHERE id NOT IN (?)', [activeClinicIds]);
+    }
+
     for (let i = 0; i < payload.clinics.length; i++) {
       const c = payload.clinics[i];
       const sortOrder = c.sortOrder !== undefined ? c.sortOrder : i + 1;
@@ -1141,7 +1146,7 @@ app.post('/api/settings', requireAuth(['ADMIN']), async (req, res) => {
     res.json({ success: true, hospital: updatedState.hospital, clinics: updatedState.clinics, counters: updatedState.counters });
   } catch (err) {
     console.error('REST API /api/settings error:', err);
-    res.status(500).json({ success: false, error: 'Gagal merubah pengaturan.' });
+    res.status(err.statusCode || 500).json({ success: false, error: err.message || 'Gagal merubah pengaturan.' });
   }
 });
 
@@ -1292,7 +1297,7 @@ app.post('/api/reset-shift', requireAuth(['ADMIN', 'PENDAFTARAN']), async (req, 
 
 // Fallback to index.html for SPA routing (Express v5 compatible)
 app.use((req, res, next) => {
-  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+  if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/videos')) {
     return res.sendFile(path.join(__dirname, 'dist', 'index.html'));
   }
   next();
@@ -1370,7 +1375,7 @@ io.on('connection', async (socket) => {
 
       const today = getLocalDateStr();
       const [todayTickets] = await pool.query(
-        'SELECT COUNT(*) as cnt FROM tickets WHERE clinic_id = ? AND date = ? AND archived = 0',
+        'SELECT COUNT(*) as cnt, COALESCE(MAX(sequence), 0) as maxSeq FROM tickets WHERE clinic_id = ? AND date = ? AND archived = 0',
         [clinicId, today]
       );
 
@@ -1380,7 +1385,7 @@ io.on('connection', async (socket) => {
         return;
       }
 
-      const nextSeq = countToday + 1;
+      const nextSeq = Math.max(countToday, todayTickets[0].maxSeq) + 1;
       const seqPadded = String(nextSeq).padStart(3, '0');
       const ticketNumber = `${clinic.prefix}-${seqPadded}`;
       const ticketId = `tkt_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
@@ -1461,7 +1466,7 @@ io.on('connection', async (socket) => {
       if (!targetTicketId && clinicId) {
         const today = getLocalDateStr();
         const [waiting] = await pool.query(
-          `SELECT id FROM tickets WHERE clinic_id = ? AND date = ? AND status = 'WAITING' AND archived = 0 ORDER BY created_at ASC LIMIT 1`,
+          `SELECT id FROM tickets WHERE clinic_id = ? AND date = ? AND status = 'WAITING' AND archived = 0 ORDER BY sequence ASC, created_at ASC LIMIT 1`,
           [clinicId, today]
         );
         if (waiting.length > 0) targetTicketId = waiting[0].id;
@@ -1680,7 +1685,7 @@ io.on('connection', async (socket) => {
       if (callback) callback({ success: true, hospital: updatedState.hospital, clinics: updatedState.clinics });
     } catch (err) {
       console.error('update_settings error:', err);
-      if (callback) callback({ success: false, error: 'Gagal merubah pengaturan.' });
+      if (callback) callback({ success: false, error: err.message || 'Gagal merubah pengaturan.' });
     }
   });
 
