@@ -1076,25 +1076,6 @@ async function processSaveSettings(payload) {
   }
 
   if (payload.clinics && Array.isArray(payload.clinics)) {
-    // Validate that counter names/numbers are unique across clinics
-    const seenCounters = new Set();
-    const duplicates = [];
-    for (let i = 0; i < payload.clinics.length; i++) {
-      const c = payload.clinics[i];
-      const counterName = c.counterName ? c.counterName.trim() : `Loket ${i + 1}`;
-      const lower = counterName.toLowerCase();
-      if (seenCounters.has(lower)) {
-        duplicates.push(counterName);
-      } else {
-        seenCounters.add(lower);
-      }
-    }
-    if (duplicates.length > 0) {
-      const err = new Error(`Nomor Loket tidak boleh sama antar poliklinik! Terdapat nomor kembar: ${[...new Set(duplicates)].join(', ')}`);
-      err.statusCode = 400;
-      throw err;
-    }
-
     const activeClinicIds = payload.clinics.map(c => c.id).filter(Boolean);
     if (activeClinicIds.length > 0) {
       await pool.query('DELETE FROM clinics WHERE id NOT IN (?)', [activeClinicIds]);

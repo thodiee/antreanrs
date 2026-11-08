@@ -774,24 +774,6 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
   };
 
   const handleSaveClinics = () => {
-    // Check for duplicate counter numbers
-    const usedCounts = {};
-    const duplicates = [];
-    clinicList.forEach((c, idx) => {
-      const num = getCounterNumber(c.counterName, idx + 1);
-      if (usedCounts[num]) {
-        duplicates.push(num);
-      } else {
-        usedCounts[num] = true;
-      }
-    });
-
-    if (duplicates.length > 0) {
-      const uniqueDups = [...new Set(duplicates)];
-      showToast(`Gagal menyimpan: Nomor Loket tidak boleh sama! Ditemukan nomor kembar: Loket ${uniqueDups.join(', Loket ')}. Harap ubah agar berbeda atau klik tombol "⚡ Urutkan 1..N".`, 'danger');
-      return;
-    }
-
     // Generate counters synced from clinics so counters list stays in sync
     const syncedCounters = clinicList.map((c, idx) => {
       const num = getCounterNumber(c.counterName, idx + 1);
@@ -820,27 +802,13 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     setClinicList(clinicList.map(c => c.id === clinicId ? { ...c, counterName: formatted } : c));
   };
 
-  const handleSwapClinicCounterNumber = (clinicIdA, clinicIdB) => {
-    const clinicA = clinicList.find(c => c.id === clinicIdA);
-    const clinicB = clinicList.find(c => c.id === clinicIdB);
-    if (!clinicA || !clinicB) return;
-    const counterA = clinicA.counterName;
-    const counterB = clinicB.counterName;
-    setClinicList(clinicList.map(c => {
-      if (c.id === clinicIdA) return { ...c, counterName: counterB };
-      if (c.id === clinicIdB) return { ...c, counterName: counterA };
-      return c;
-    }));
-    showToast(`Nomor loket '${clinicA.name}' dan '${clinicB.name}' berhasil ditukar.`);
-  };
-
   const handleAutoSequenceLoket = () => {
     const resequenced = clinicList.map((c, idx) => ({
       ...c,
       counterName: `Loket ${idx + 1}`
     }));
     setClinicList(resequenced);
-    showToast(`Semua nomor loket berhasil diurutkan otomatis (1 s/d ${clinicList.length}) tanpa nomor kembar!`);
+    showToast(`Semua nomor loket berhasil diurutkan berurutan (1 s/d ${clinicList.length})!`);
   };
 
   const handleAddCounter = () => {
@@ -982,13 +950,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
           <button
             className={`view-btn ${activeTab === 'users' ? 'active' : ''}`}
             onClick={() => setActiveTab('users')}
-            style={{
-              fontWeight: '800',
-              borderRadius: '8px',
-              background: activeTab === 'users' ? 'white' : '#ecfdf5',
-              color: activeTab === 'users' ? '#166534' : '#15803d',
-              border: '1px solid #a7f3d0'
-            }}
+            style={{ fontWeight: '700', borderRadius: '8px' }}
           >
             <Users size={16} /> Manajemen Pengguna
           </button>
@@ -998,13 +960,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
               setActiveTab('beds');
               fetchBeds();
             }}
-            style={{
-              fontWeight: '800',
-              borderRadius: '8px',
-              background: activeTab === 'beds' ? 'white' : '#ecfdf5',
-              color: activeTab === 'beds' ? '#166534' : '#15803d',
-              border: '1px solid #a7f3d0'
-            }}
+            style={{ fontWeight: '700', borderRadius: '8px' }}
           >
             <BedDouble size={16} /> Ketersediaan Kamar / TT
           </button>
@@ -1200,7 +1156,7 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                         fontWeight: '800',
                         whiteSpace: 'nowrap'
                       }}
-                      title="Klik untuk mengurutkan nomor loket otomatis 1, 2, 3... berurutan tanpa kembar"
+                      title="Klik untuk mengurutkan nomor loket otomatis 1, 2, 3... berurutan"
                     >
                       ⚡ Urutkan 1..N
                     </button>
@@ -1271,26 +1227,25 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                     <td>
                       {(() => {
                         const currentNum = getCounterNumber(c.counterName, idx + 1);
-                        // Calculate usage across clinicList
-                        const usageList = clinicList.filter((other, i) => getCounterNumber(other.counterName, i + 1) === currentNum);
-                        const isDuplicate = usageList.length > 1;
-                        const conflictingClinics = isDuplicate ? usageList.filter(other => other.id !== c.id) : [];
+                        // Calculate usage across clinicList to show if room is shared
+                        const sharedClinics = clinicList.filter((other, i) => other.id !== c.id && getCounterNumber(other.counterName, i + 1) === currentNum);
+                        const isShared = sharedClinics.length > 0;
 
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                             <div style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              border: isDuplicate ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                              border: isShared ? '1.5px solid #60a5fa' : '1px solid #cbd5e1',
                               borderRadius: '8px',
                               overflow: 'hidden',
                               background: '#ffffff',
-                              boxShadow: isDuplicate ? '0 0 0 3px rgba(239, 68, 68, 0.15)' : 'none'
+                              boxShadow: isShared ? '0 1px 3px rgba(37, 99, 235, 0.12)' : 'none'
                             }}>
                               <span style={{
                                 padding: '5px 8px',
-                                background: isDuplicate ? '#fee2e2' : '#f8fafc',
-                                color: isDuplicate ? '#b91c1c' : '#475569',
+                                background: isShared ? '#eff6ff' : '#f8fafc',
+                                color: isShared ? '#1d4ed8' : '#475569',
                                 fontWeight: '800',
                                 fontSize: '0.85rem',
                                 borderRight: '1px solid #cbd5e1',
@@ -1311,37 +1266,30 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                                   outline: 'none',
                                   textAlign: 'center',
                                   fontWeight: '800',
-                                  color: isDuplicate ? '#b91c1c' : '#15803d',
+                                  color: isShared ? '#1d4ed8' : '#15803d',
                                   fontSize: '0.95rem'
                                 }}
-                                title={`Nomor loket untuk ${c.name} (Hanya ubah angka)`}
+                                title={`Nomor loket/ruangan untuk ${c.name} (Boleh sama jika 1 ruangan)`}
                               />
                             </div>
 
-                            {isDuplicate && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                                <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#b91c1c', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px' }}>
-                                  ⚠️ Kembar!
+                            {isShared && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span 
+                                  style={{ 
+                                    fontSize: '0.67rem', 
+                                    fontWeight: '700', 
+                                    color: '#1d4ed8', 
+                                    background: '#eff6ff', 
+                                    border: '1px solid #bfdbfe',
+                                    padding: '1px 6px', 
+                                    borderRadius: '4px',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  title={`1 Ruangan dengan: ${sharedClinics.map(s => s.name).join(', ')}`}
+                                >
+                                  🏢 1 Ruang ({sharedClinics.length + 1} Poli)
                                 </span>
-                                {conflictingClinics.length > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSwapClinicCounterNumber(c.id, conflictingClinics[0].id)}
-                                    style={{
-                                      fontSize: '0.68rem',
-                                      fontWeight: '800',
-                                      color: '#1e40af',
-                                      background: '#dbeafe',
-                                      border: '1px solid #bfdbfe',
-                                      padding: '1px 6px',
-                                      borderRadius: '4px',
-                                      cursor: 'pointer'
-                                    }}
-                                    title={`Tukar nomor loket dengan ${conflictingClinics[0].name}`}
-                                  >
-                                    Tukar ⇄
-                                  </button>
-                                )}
                               </div>
                             )}
                           </div>
