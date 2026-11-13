@@ -481,7 +481,8 @@ async function getFullState(user = null) {
     layoutRatio: '50-50',
     aspectRatio: '16-9',
     objectFit: 'contain',
-    position: 'right'
+    position: 'right',
+    voiceCallFormat: 'counter_only'
   };
 
   let parsedDisplaySettings = defaultDisplaySettings;

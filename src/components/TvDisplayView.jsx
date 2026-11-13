@@ -50,7 +50,8 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     clinicNameFontSize: '1.35',
     queueNumberFontSize: '2.7',
     activeCallNumberFontSize: '7.5',
-    activeCallDestFontSize: '2.25'
+    activeCallDestFontSize: '2.25',
+    voiceCallFormat: 'counter_only'
   };
 
   // Helper refs to prevent stale closures in audio & tts callbacks
@@ -253,13 +254,15 @@ export default function TvDisplayView({ hospital, clinics = [], tickets = [], la
     if (lastCall && lastCall.ticket) {
       setAudioUnlocked(true);
       audioUnlockedRef.current = true;
+      const targetClinicName = lastCall.ticket.clinicName || clinics.find(c => c.id === lastCall.ticket.clinicId)?.name || '';
       ttsEngine.speakCall(
         lastCall.ticket,
         lastCall.ticket.counterName,
-        lastCall.ticket.clinicName
+        targetClinicName,
+        displaySettings.voiceCallFormat || 'counter_only'
       );
     }
-  }, [lastCall]);
+  }, [lastCall, displaySettings.voiceCallFormat, clinics]);
 
   const handleUnlockAudio = (e) => {
     e?.stopPropagation();

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Settings, Film, RefreshCw, Download, Plus, Trash2, Check, AlertTriangle, Layers, Users, Clock, Upload, Image, Video, FileVideo, ArrowUp, ArrowDown, Sparkles, Printer, Sliders, Edit2, KeyRound, Shield, ShieldCheck, Ticket, UserCheck, Monitor, Tv, Maximize2, MoveHorizontal, X, ExternalLink, Volume2, Volume1, VolumeX, Building2, Zap, Lightbulb, Megaphone, QrCode, MapPin, Phone, BedDouble, Activity, CheckCircle2, Minus, Search, Filter } from 'lucide-react';
 import ThermalTicketModal from './ThermalTicketModal';
 import { parseVideoUrl } from '../utils/videoHelper';
+import { ttsEngine } from '../services/tts';
 
 const DAYS_LIST = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
@@ -23,7 +24,8 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
     clinicNameFontSize: hospital?.displaySettings?.clinicNameFontSize || '1.35',
     queueNumberFontSize: hospital?.displaySettings?.queueNumberFontSize || '2.7',
     activeCallNumberFontSize: hospital?.displaySettings?.activeCallNumberFontSize || '7.5',
-    activeCallDestFontSize: hospital?.displaySettings?.activeCallDestFontSize || '2.25'
+    activeCallDestFontSize: hospital?.displaySettings?.activeCallDestFontSize || '2.25',
+    voiceCallFormat: hospital?.displaySettings?.voiceCallFormat || 'counter_only'
   });
   const [addVideoModalOpen, setAddVideoModalOpen] = useState(false);
   const [videoModalUrl, setVideoModalUrl] = useState('');
@@ -2315,6 +2317,110 @@ export default function AdminDashboardView({ hospital, clinics = [], counters = 
                     </>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* 3C. PENGATURAN FORMAT SUARA PANGGILAN ANTREAN (AUDIO TTS) */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1.25rem', borderRadius: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <label style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Megaphone size={20} style={{ color: '#15803d' }} />
+                    <span>Format Suara Panggilan Antrean (Audio TTS)</span>
+                  </label>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                    Atur bagaimana suara mesin panggilan menyebutkan tujuan pasien saat tombol panggil ditekan oleh petugas.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ background: '#0284c7', padding: '8px 16px', fontSize: '0.85rem' }}
+                  onClick={() => {
+                    ttsEngine.previewCall(
+                      displaySettings.voiceCallFormat || 'counter_only',
+                      { ticketNumber: 'A-012', clinicName: 'Poli Penyakit Dalam' },
+                      'Loket 1'
+                    );
+                  }}
+                  title="Klik untuk mendengarkan simulasi pengucapan suara panggilan"
+                >
+                  <Volume2 size={16} /> Uji Coba Suara
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                {[
+                  {
+                    id: 'counter_only',
+                    title: 'Nomor & Loket Saja (Default)',
+                    desc: 'Menyebutkan nomor antrean lalu tujuan loket.',
+                    example: '"Nomor antrean A, nol, satu, dua, ke Loket 1"'
+                  },
+                  {
+                    id: 'clinic_only',
+                    title: 'Nomor & Nama Poli Saja',
+                    desc: 'Menyebutkan nomor antrean lalu nama poliklinik tujuan.',
+                    example: '"Nomor antrean A, nol, satu, dua, ke Poli Penyakit Dalam"'
+                  },
+                  {
+                    id: 'counter_and_clinic',
+                    title: 'Nomor, Loket & Nama Poli',
+                    desc: 'Menyebutkan nomor antrean, loket, diikuti nama poliklinik.',
+                    example: '"Nomor antrean A, nol, satu, dua, ke Loket 1, Poli Penyakit Dalam"'
+                  },
+                  {
+                    id: 'clinic_and_counter',
+                    title: 'Nomor, Nama Poli & Loket',
+                    desc: 'Menyebutkan nomor antrean, nama poli, diikuti loket.',
+                    example: '"Nomor antrean A, nol, satu, dua, ke Poli Penyakit Dalam, Loket 1"'
+                  }
+                ].map((opt) => {
+                  const isSelected = (displaySettings.voiceCallFormat || 'counter_only') === opt.id;
+                  return (
+                    <div
+                      key={opt.id}
+                      onClick={() => setDisplaySettings({ ...displaySettings, voiceCallFormat: opt.id })}
+                      style={{
+                        padding: '1rem',
+                        borderRadius: '12px',
+                        border: isSelected ? '2px solid #15803d' : '1px solid #cbd5e1',
+                        background: isSelected ? '#f0fdf4' : 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isSelected ? '0 4px 12px rgba(21, 128, 61, 0.12)' : 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontWeight: '800', fontSize: '0.9rem', color: isSelected ? '#15803d' : '#1e293b' }}>
+                          {opt.title}
+                        </span>
+                        <input
+                          type="radio"
+                          name="voiceCallFormat"
+                          checked={isSelected}
+                          onChange={() => setDisplaySettings({ ...displaySettings, voiceCallFormat: opt.id })}
+                          style={{ accentColor: '#15803d', cursor: 'pointer' }}
+                        />
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '8px', lineHeight: 1.4 }}>
+                        {opt.desc}
+                      </p>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        color: isSelected ? '#166534' : '#475569',
+                        background: isSelected ? '#dcfce7' : '#f1f5f9',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontStyle: 'italic'
+                      }}>
+                        🔊 {opt.example}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

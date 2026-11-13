@@ -37,16 +37,43 @@ class TtsEngine {
     return `${prefix} ${numDigits}`;
   }
 
-  speakCall(ticket, counterName, clinicName) {
-    const spokenNum = this.formatTicketForSpeech(ticket.ticketNumber);
-    let destination = (counterName || clinicName || 'Loket').trim();
-    if (/^\d+$/.test(destination)) {
-      destination = `Loket ${destination}`;
+  speakCall(ticket, counterName, clinicName, callFormat = 'counter_only') {
+    const spokenNum = this.formatTicketForSpeech(ticket?.ticketNumber);
+    let counter = (counterName || '').trim();
+    if (/^\d+$/.test(counter)) {
+      counter = `Loket ${counter}`;
     }
-    const text = `Nomor antrean, ${spokenNum}, ke, ${destination}`;
+    const clinic = (clinicName || ticket?.clinicName || '').trim();
+
+    let text = `Nomor antrean, ${spokenNum}`;
+
+    if (callFormat === 'clinic_only') {
+      const destination = clinic || counter || 'Loket';
+      text += `, ke, ${destination}`;
+    } else if (callFormat === 'counter_and_clinic') {
+      if (counter && clinic) {
+        text += `, ke, ${counter}, ${clinic}`;
+      } else {
+        text += `, ke, ${counter || clinic || 'Loket'}`;
+      }
+    } else if (callFormat === 'clinic_and_counter') {
+      if (clinic && counter) {
+        text += `, ke, ${clinic}, ${counter}`;
+      } else {
+        text += `, ke, ${clinic || counter || 'Loket'}`;
+      }
+    } else {
+      // 'counter_only' (default)
+      const destination = counter || clinic || 'Loket';
+      text += `, ke, ${destination}`;
+    }
 
     this.queue.push({ text, ticket });
     this.processQueue();
+  }
+
+  previewCall(callFormat = 'counter_only', sampleTicket = { ticketNumber: 'A-012', clinicName: 'Poli Penyakit Dalam' }, sampleCounter = 'Loket 1') {
+    this.speakCall(sampleTicket, sampleCounter, sampleTicket.clinicName, callFormat);
   }
 
   processQueue() {
